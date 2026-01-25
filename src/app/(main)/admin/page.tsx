@@ -11,15 +11,31 @@ import { Modal } from '@/components/ui/modal';
 import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield, Check, X, Clock } from 'lucide-react';
 import { Profile } from '@/types';
 
-interface ProfileWithStatus extends Profile {
-  status?: 'pending' | 'approved' | 'rejected';
+type RoleType = 'admin' | 'member' | 'visitor' | 'pending';
+
+interface ProfileWithRole extends Omit<Profile, 'role'> {
+  role: RoleType;
 }
+
+const roleLabels: Record<RoleType, string> = {
+  admin: '관리자',
+  member: '멤버',
+  visitor: '방문자',
+  pending: '가입대기',
+};
+
+const roleBadgeVariant: Record<RoleType, 'info' | 'success' | 'warning' | 'default'> = {
+  admin: 'info',
+  member: 'success',
+  visitor: 'warning',
+  pending: 'default',
+};
 
 export default function AdminPage() {
   const { profile } = useAuth();
   const supabase = createClient();
-  const [users, setUsers] = useState<ProfileWithStatus[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<ProfileWithStatus[]>([]);
+  const [users, setUsers] = useState<ProfileWithRole[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<ProfileWithRole[]>([]);
   const [stats, setStats] = useState({
     users: 0,
     books: 0,
@@ -28,7 +44,7 @@ export default function AdminPage() {
     reviews: 0,
     recaps: 0,
   });
-  const [selectedUser, setSelectedUser] = useState<ProfileWithStatus | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ProfileWithRole | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
@@ -46,9 +62,9 @@ export default function AdminPage() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    const allUsers = (usersData as ProfileWithStatus[]) || [];
-    setUsers(allUsers.filter(u => u.status === 'approved'));
-    setPendingUsers(allUsers.filter(u => u.status === 'pending'));
+    const allUsers = (usersData as ProfileWithRole[]) || [];
+    setUsers(allUsers.filter(u => u.role !== 'pending'));
+    setPendingUsers(allUsers.filter(u => u.role === 'pending'));
 
     // Fetch stats
     const [
@@ -59,7 +75,7 @@ export default function AdminPage() {
       { count: reviewCount },
       { count: recapCount },
     ] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'pending'),
       supabase.from('books').select('*', { count: 'exact', head: true }),
       supabase.from('schedules').select('*', { count: 'exact', head: true }),
       supabase.from('discussions').select('*', { count: 'exact', head: true }),
@@ -80,20 +96,25 @@ export default function AdminPage() {
   const handleApprove = async (userId: string) => {
     await supabase
       .from('profiles')
-      .update({ status: 'approved' })
+      .update({ role: 'member' })
       .eq('id', userId);
     await fetchData();
   };
 
   const handleReject = async (userId: string) => {
+    // Delete from profiles
     await supabase
       .from('profiles')
-      .update({ status: 'rejected' })
+      .delete()
       .eq('id', userId);
+
+    // Delete from auth.users (admin API call)
+    await supabase.auth.admin.deleteUser(userId);
+
     await fetchData();
   };
 
-  const handleRoleChange = async (userId: string, newRole: 'admin' | 'member') => {
+  const handleRoleChange = async (userId: string, newRole: RoleType) => {
     await supabase
       .from('profiles')
       .update({ role: newRole })
@@ -204,8 +225,8 @@ export default function AdminPage() {
                     </td>
                     <td className="py-3 px-4 text-gray-600">{user.email}</td>
                     <td className="py-3 px-4">
-                      <Badge variant={user.role === 'admin' ? 'info' : 'default'}>
-                        {user.role === 'admin' ? '관리자' : '멤버'}
+                      <Badge variant={roleBadgeVariant[user.role]}>
+                        {roleLabels[user.role]}
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-gray-600">
@@ -249,30 +270,31 @@ export default function AdminPage() {
             </div>
 
             <p className="text-gray-600">
-              현재 역할: <Badge variant={selectedUser.role === 'admin' ? 'info' : 'default'}>
-                {selectedUser.role === 'admin' ? '관리자' : '멤버'}
+              현재 역할: <Badge variant={roleBadgeVariant[selectedUser.role]}>
+                {roleLabels[selectedUser.role]}
               </Badge>
             </p>
 
-            <div className="flex gap-3">
-              {selectedUser.role === 'member' ? (
-                <Button
-                  onClick={() => handleRoleChange(selectedUser.id, 'admin')}
-                >
-                  관리자로 변경
-                </Button>
-              ) : (
-                <Button
-                  variant="danger"
-                  onClick={() => handleRoleChange(selectedUser.id, 'member')}
-                >
-                  멤버로 변경
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-                취소
-              </Button>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">변경할 역할 선택:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(['admin', 'member', 'visitor'] as RoleType[]).map((role) => (
+                  <Button
+                    key={role}
+                    variant={selectedUser.role === role ? 'primary' : 'outline'}
+                    size="sm"
+                    onClick={() => handleRoleChange(selectedUser.id, role)}
+                    disabled={selectedUser.role === role}
+                  >
+                    {roleLabels[role]}
+                  </Button>
+                ))}
+              </div>
             </div>
+
+            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="w-full">
+              취소
+            </Button>
           </div>
         )}
       </Modal>

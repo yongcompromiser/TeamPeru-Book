@@ -50,32 +50,32 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If user is logged in, check their status
+  // If user is logged in, check their role
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('status')
+      .select('role')
       .eq('id', user.id)
       .single();
 
-    const status = profile?.status || 'pending';
+    const role = profile?.role || 'pending';
 
     // If pending, redirect to pending page
-    if (status === 'pending' && !isPendingPage) {
+    if (role === 'pending' && !isPendingPage) {
       const url = request.nextUrl.clone();
       url.pathname = '/pending';
       return NextResponse.redirect(url);
     }
 
-    // If approved and on pending page, redirect to dashboard
-    if (status === 'approved' && isPendingPage) {
+    // If not pending and on pending page, redirect to dashboard
+    if (role !== 'pending' && isPendingPage) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);
     }
 
-    // If approved and on auth pages, redirect to dashboard
-    if (status === 'approved' && isAuthPage) {
+    // If not pending and on auth pages, redirect to dashboard
+    if (role !== 'pending' && isAuthPage) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);

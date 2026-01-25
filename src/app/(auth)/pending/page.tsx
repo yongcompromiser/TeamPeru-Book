@@ -22,13 +22,17 @@ export default function PendingPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('status')
+        .select('role')
         .eq('id', user.id)
         .single();
 
-      if (profile?.status === 'approved') {
+      // pending이 아니면 대시보드로
+      if (profile && profile.role !== 'pending') {
         router.push('/dashboard');
-      } else if (profile?.status === 'rejected') {
+      }
+
+      // profile이 없으면 (거부되어 삭제됨) 로그아웃
+      if (!profile) {
         await supabase.auth.signOut();
         router.push('/login?error=rejected');
       }
