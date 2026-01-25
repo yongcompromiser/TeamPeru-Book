@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Menu, LogOut, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Profile } from '@/types';
@@ -16,6 +17,7 @@ interface HeaderProps {
 export function Header({ profile, onMenuClick }: HeaderProps) {
   const router = useRouter();
   const supabase = createClient();
+  const { user } = useAuth();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -45,19 +47,19 @@ export function Header({ profile, onMenuClick }: HeaderProps) {
 
           {/* Right side */}
           <div className="flex items-center gap-4">
-            {profile ? (
+            {user ? (
               <>
                 <Link
                   href="/profile"
                   className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-3 py-2"
                 >
                   <Avatar
-                    src={profile.avatar_url}
-                    name={profile.name}
+                    src={profile?.avatar_url}
+                    name={profile?.name || '사용자'}
                     size="sm"
                   />
                   <span className="text-sm font-medium text-gray-700 hidden sm:block">
-                    {profile.name}
+                    {profile?.name || '사용자'}
                   </span>
                 </Link>
                 <Button variant="ghost" size="sm" onClick={handleLogout}>
