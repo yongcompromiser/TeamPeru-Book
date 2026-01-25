@@ -1,29 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { BookOpen, Menu, LogOut, User } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { BookOpen, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Profile } from '@/types';
 
 interface HeaderProps {
-  profile?: Profile | null;
   onMenuClick?: () => void;
 }
 
-export function Header({ profile, onMenuClick }: HeaderProps) {
-  const router = useRouter();
-  const supabase = createClient();
-  const { user } = useAuth();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
+export function Header({ onMenuClick }: HeaderProps) {
+  const { user, profile, logout } = useAuth();
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -55,14 +43,14 @@ export function Header({ profile, onMenuClick }: HeaderProps) {
                 >
                   <Avatar
                     src={profile?.avatar_url}
-                    name={profile?.name || '사용자'}
+                    name={profile?.name || user.email?.split('@')[0] || '사용자'}
                     size="sm"
                   />
                   <span className="text-sm font-medium text-gray-700 hidden sm:block">
-                    {profile?.name || '사용자'}
+                    {profile?.name || user.email?.split('@')[0] || '사용자'}
                   </span>
                 </Link>
-                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <Button variant="ghost" size="sm" onClick={logout}>
                   <LogOut className="w-4 h-4" />
                 </Button>
               </>

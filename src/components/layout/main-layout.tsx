@@ -15,10 +15,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header
-        profile={profile}
-        onMenuClick={() => setSidebarOpen(true)}
-      />
+      <Header onMenuClick={() => setSidebarOpen(true)} />
       <div className="flex">
         <Sidebar
           profile={profile}
