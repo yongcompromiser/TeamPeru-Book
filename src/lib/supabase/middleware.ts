@@ -41,19 +41,45 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/signup');
+  const isPendingPage = request.nextUrl.pathname.startsWith('/pending');
 
   // If user is not logged in and trying to access protected routes
-  if (!user && !isAuthPage && request.nextUrl.pathname !== '/') {
+  if (!user && !isAuthPage && !isPendingPage && request.nextUrl.pathname !== '/') {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  // If user is logged in and trying to access auth pages
-  if (user && isAuthPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+  // If user is logged in, check their status
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('status')
+      .eq('id', user.id)
+      .single();
+
+    const status = profile?.status || 'pending';
+
+    // If pending, redirect to pending page
+    if (status === 'pending' && !isPendingPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/pending';
+      return NextResponse.redirect(url);
+    }
+
+    // If approved and on pending page, redirect to dashboard
+    if (status === 'approved' && isPendingPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
+
+    // If approved and on auth pages, redirect to dashboard
+    if (status === 'approved' && isAuthPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

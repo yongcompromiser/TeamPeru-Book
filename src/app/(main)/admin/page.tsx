@@ -8,13 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield } from 'lucide-react';
+import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield, Check, X, Clock } from 'lucide-react';
 import { Profile } from '@/types';
+
+interface ProfileWithStatus extends Profile {
+  status?: 'pending' | 'approved' | 'rejected';
+}
 
 export default function AdminPage() {
   const { profile } = useAuth();
   const supabase = createClient();
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [users, setUsers] = useState<ProfileWithStatus[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<ProfileWithStatus[]>([]);
   const [stats, setStats] = useState({
     users: 0,
     books: 0,
@@ -23,7 +28,7 @@ export default function AdminPage() {
     reviews: 0,
     recaps: 0,
   });
-  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ProfileWithStatus | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
@@ -35,12 +40,15 @@ export default function AdminPage() {
   }, [isAdmin]);
 
   const fetchData = async () => {
-    // Fetch users
+    // Fetch all users
     const { data: usersData } = await supabase
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false });
-    setUsers((usersData as Profile[]) || []);
+
+    const allUsers = (usersData as ProfileWithStatus[]) || [];
+    setUsers(allUsers.filter(u => u.status === 'approved'));
+    setPendingUsers(allUsers.filter(u => u.status === 'pending'));
 
     // Fetch stats
     const [
@@ -51,7 +59,7 @@ export default function AdminPage() {
       { count: reviewCount },
       { count: recapCount },
     ] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
       supabase.from('books').select('*', { count: 'exact', head: true }),
       supabase.from('schedules').select('*', { count: 'exact', head: true }),
       supabase.from('discussions').select('*', { count: 'exact', head: true }),
@@ -67,6 +75,22 @@ export default function AdminPage() {
       reviews: reviewCount || 0,
       recaps: recapCount || 0,
     });
+  };
+
+  const handleApprove = async (userId: string) => {
+    await supabase
+      .from('profiles')
+      .update({ status: 'approved' })
+      .eq('id', userId);
+    await fetchData();
+  };
+
+  const handleReject = async (userId: string) => {
+    await supabase
+      .from('profiles')
+      .update({ status: 'rejected' })
+      .eq('id', userId);
+    await fetchData();
   };
 
   const handleRoleChange = async (userId: string, newRole: 'admin' | 'member') => {
@@ -101,6 +125,53 @@ export default function AdminPage() {
         <StatCard title="독후감" value={stats.reviews} icon={PenTool} />
         <StatCard title="후기" value={stats.recaps} icon={Camera} />
       </div>
+
+      {/* Pending Approvals */}
+      {pendingUsers.length > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2 text-yellow-800">
+              <Clock className="w-5 h-5" />
+              가입 승인 대기 ({pendingUsers.length}명)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {pendingUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between bg-white p-4 rounded-lg border"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar src={user.avatar_url} name={user.name} size="sm" />
+                    <div>
+                      <p className="font-medium text-gray-900">{user.name}</p>
+                      <p className="text-sm text-gray-600">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(user.id)}
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      승인
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => handleReject(user.id)}
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      거부
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* User Management */}
       <Card>
