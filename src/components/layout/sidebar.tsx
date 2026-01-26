@@ -24,7 +24,8 @@ interface SidebarProps {
 
 const menuItems = [
   { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-  { href: '/schedule', label: '모임 일정', icon: Calendar },
+  { href: '/schedule', label: '일정 투표', icon: Calendar },
+  { href: '/meetings', label: '모임 목록', icon: Users },
   { href: '/books', label: '책 목록', icon: BookOpen },
   { href: '/discussions', label: '발제', icon: MessageSquare },
   { href: '/reviews', label: '독후감', icon: PenTool },
