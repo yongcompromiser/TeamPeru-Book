@@ -58,6 +58,7 @@ interface BookCandidate {
 interface BookVote {
   book_id: string;
   user_id: string;
+  voter_name?: string;
 }
 
 export default function SchedulePage() {
@@ -191,7 +192,24 @@ export default function SchedulePage() {
       .from('book_votes')
       .select('book_id, user_id')
       .eq('schedule_id', scheduleId);
-    setBookVotes(votes || []);
+
+    // 투표자 이름 가져오기
+    if (votes && votes.length > 0) {
+      const userIds = [...new Set(votes.map(v => v.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p.name]) || []);
+      const votesWithNames = votes.map(v => ({
+        ...v,
+        voter_name: profileMap.get(v.user_id) || '알 수 없음'
+      }));
+      setBookVotes(votesWithNames);
+    } else {
+      setBookVotes([]);
+    }
   };
 
   const handleDateClick = async (day: Date) => {
@@ -412,6 +430,12 @@ export default function SchedulePage() {
     return bookVotes.some(v => v.book_id === bookId && v.user_id === user?.id);
   };
 
+  const getVotersForBook = (bookId: string) => {
+    return bookVotes
+      .filter(v => v.book_id === bookId)
+      .map(v => v.voter_name || '알 수 없음');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -555,22 +579,34 @@ export default function SchedulePage() {
                           )}
                         >
                           <div className="flex items-center justify-between">
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm">{candidate.book.title}</p>
                               <p className="text-xs text-gray-500">{candidate.book.author}</p>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 ml-2">
                               <button
                                 onClick={() => handleBookVote(candidate.book_id)}
                                 className={cn(
-                                  "flex items-center gap-1 px-2 py-1 rounded text-xs",
+                                  "flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                                   hasVotedForBook(candidate.book_id)
-                                    ? "bg-blue-500 text-white"
-                                    : "bg-gray-100 text-gray-700"
+                                    ? "bg-blue-500 text-white shadow-sm"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                 )}
                               >
-                                <Vote className="w-3 h-3" />
-                                {getBookVoteCount(candidate.book_id)}
+                                {hasVotedForBook(candidate.book_id) ? (
+                                  <>
+                                    <Check className="w-3 h-3" />
+                                    투표함
+                                  </>
+                                ) : (
+                                  <>
+                                    <Vote className="w-3 h-3" />
+                                    투표
+                                  </>
+                                )}
+                                <span className="ml-1 bg-white/20 px-1.5 rounded">
+                                  {getBookVoteCount(candidate.book_id)}
+                                </span>
                               </button>
                               {canManageBooks && !selectedSchedule.selected_book_id && (
                                 <Button
@@ -583,10 +619,16 @@ export default function SchedulePage() {
                               )}
                             </div>
                           </div>
+                          {/* 투표자 목록 */}
+                          {getBookVoteCount(candidate.book_id) > 0 && (
+                            <div className="mt-2 text-xs text-gray-500">
+                              투표: {getVotersForBook(candidate.book_id).join(', ')}
+                            </div>
+                          )}
                           {canManageBooks && (
                             <button
                               onClick={() => handleRemoveBookCandidate(candidate.id)}
-                              className="text-xs text-red-500 mt-1"
+                              className="text-xs text-red-500 mt-1 hover:underline"
                             >
                               제거
                             </button>
