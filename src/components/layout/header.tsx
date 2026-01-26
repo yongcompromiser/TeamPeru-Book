@@ -20,76 +20,101 @@ interface Profile {
 export function Header({ onMenuClick }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setMounted(true);
-
     const supabase = createClient();
 
     const loadUser = async () => {
-      console.log('Loading user...');
-      const { data: { user }, error } = await supabase.auth.getUser();
-      console.log('User loaded:', user?.email, 'Error:', error);
+      try {
+        console.log('Loading user...');
 
-      if (user) {
-        setUser(user);
+        // 타임아웃 추가 (5초)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), 5000)
+        );
 
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('name, avatar_url, role')
-          .eq('id', user.id)
-          .single();
+        const userPromise = supabase.auth.getUser();
 
-        console.log('Profile loaded:', profileData, 'Error:', profileError);
-        setProfile(profileData);
+        const result = await Promise.race([userPromise, timeoutPromise]) as any;
+
+        const userData = result?.data?.user;
+        const error = result?.error;
+
+        console.log('User loaded:', userData?.email, 'Error:', error?.message);
+
+        if (userData) {
+          setUser(userData);
+
+          // Profile 로드
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('name, avatar_url, role')
+            .eq('id', userData.id)
+            .single();
+
+          console.log('Profile loaded:', profileData, 'Error:', profileError?.message);
+          if (profileData) {
+            setProfile(profileData);
+          }
+        }
+      } catch (err) {
+        console.error('Load error:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadUser();
+
+    // Auth state 변경 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      if (session?.user) {
+        setUser(session.user);
+        // Profile도 다시 로드
+        supabase
+          .from('profiles')
+          .select('name, avatar_url, role')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data }) => {
+            if (data) setProfile(data);
+          });
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = () => {
-    console.log('Logout clicked - starting');
+    console.log('Logout clicked');
 
-    // 즉시 쿠키 삭제
+    // 쿠키 삭제
     document.cookie.split(";").forEach((c) => {
       const eqPos = c.indexOf("=");
       const name = eqPos > -1 ? c.substring(0, eqPos) : c;
       document.cookie = name.trim() + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
     });
 
-    // localStorage 클리어
-    localStorage.clear();
-    sessionStorage.clear();
+    // 스토리지 클리어
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (e) {
+      console.error('Storage clear error:', e);
+    }
 
-    console.log('Cookies and storage cleared, redirecting...');
-
-    // 강제 리다이렉트
-    window.location.replace('/login');
+    console.log('Redirecting to login...');
+    window.location.href = '/login';
   };
 
-  // 마운트 전에는 빈 헤더
-  if (!mounted) {
-    return (
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <Link href="/dashboard" className="flex items-center gap-2">
-                <BookOpen className="w-8 h-8 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900 hidden sm:block">
-                  독서토론
-                </span>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-    );
-  }
-
-  const displayName = profile?.name || user?.email?.split('@')[0] || '사용자';
+  const displayName = profile?.name || user?.email?.split('@')[0] || '';
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -114,7 +139,9 @@ export function Header({ onMenuClick }: HeaderProps) {
 
           {/* Right side */}
           <div className="flex items-center gap-4">
-            {user ? (
+            {isLoading ? (
+              <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+            ) : user ? (
               <>
                 <Link
                   href="/profile"
@@ -122,17 +149,17 @@ export function Header({ onMenuClick }: HeaderProps) {
                 >
                   <Avatar
                     src={profile?.avatar_url}
-                    name={displayName}
+                    name={displayName || '사용자'}
                     size="sm"
                   />
                   <span className="text-sm font-medium text-gray-700 hidden sm:block">
-                    {displayName}
+                    {displayName || '사용자'}
                   </span>
                 </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer"
+                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
                 >
                   <LogOut className="w-5 h-5" />
                 </button>
