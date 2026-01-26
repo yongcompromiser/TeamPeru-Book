@@ -212,30 +212,33 @@ export default function SchedulePage() {
     }
   };
 
+  // 날짜 클릭 = 정보만 보기
   const handleDateClick = async (day: Date) => {
-    if (!user) return;
-
     const dateKey = format(day, 'yyyy-MM-dd');
 
     // Check if this date already has a confirmed schedule
-    const hasSchedule = schedules.some(s =>
+    const schedule = schedules.find(s =>
       format(new Date(s.meeting_date), 'yyyy-MM-dd') === dateKey
     );
 
-    if (hasSchedule) {
-      // Show schedule details instead of voting
-      const schedule = schedules.find(s =>
-        format(new Date(s.meeting_date), 'yyyy-MM-dd') === dateKey
-      );
-      if (schedule) {
-        setSelectedSchedule(schedule);
-        setSelectedDate(day);
-        await fetchBookCandidates(schedule.id);
-      }
-      return;
+    if (schedule) {
+      setSelectedSchedule(schedule);
+      setSelectedDate(day);
+      await fetchBookCandidates(schedule.id);
+    } else {
+      setSelectedSchedule(null);
+      setSelectedDate(day);
     }
+  };
 
+  // 투표 버튼 클릭 = 투표/취소
+  const handleVoteClick = async (e: React.MouseEvent, day: Date) => {
+    e.stopPropagation(); // 날짜 클릭 이벤트 방지
+    if (!user) return;
+
+    const dateKey = format(day, 'yyyy-MM-dd');
     const voteCount = voteCounts.get(dateKey);
+
     setIsLoading(true);
 
     if (voteCount?.hasMyVote) {
@@ -255,8 +258,6 @@ export default function SchedulePage() {
 
     await fetchVotes();
     setIsLoading(false);
-    setSelectedDate(day);
-    setSelectedSchedule(null);
   };
 
   const handleConfirmSchedule = async () => {
@@ -483,43 +484,63 @@ export default function SchedulePage() {
                 );
 
                 return (
-                  <button
+                  <div
                     key={day.toString()}
-                    onClick={() => !isPast && handleDateClick(day)}
-                    disabled={isPast || isLoading}
+                    onClick={() => handleDateClick(day)}
                     className={cn(
-                      'aspect-square p-1 rounded-lg text-sm transition-all relative flex flex-col items-center justify-center',
-                      isPast && 'text-gray-300 cursor-not-allowed',
-                      !isPast && 'hover:bg-gray-100',
+                      'aspect-square p-1 rounded-lg text-sm transition-all relative flex flex-col items-center justify-between cursor-pointer',
+                      isPast && 'text-gray-300',
+                      !isPast && 'hover:bg-gray-50',
                       isSelected && 'ring-2 ring-blue-500',
-                      hasMyVote && !confirmedSchedule && 'bg-blue-100 text-blue-700',
-                      confirmedSchedule && 'bg-green-100 text-green-700',
-                      isToday && !hasMyVote && !confirmedSchedule && 'font-bold text-blue-600'
+                      confirmedSchedule && 'bg-green-50',
+                      isToday && !confirmedSchedule && 'font-bold text-blue-600'
                     )}
                   >
-                    <span>{format(day, 'd')}</span>
+                    {/* 날짜 */}
+                    <span className="mt-1">{format(day, 'd')}</span>
+
+                    {/* 확정된 일정 or 투표 버튼 */}
                     {confirmedSchedule ? (
-                      <span className="text-lg">📅</span>
-                    ) : voteCount && voteCount.count > 0 ? (
-                      <span className={cn(
-                        'text-xs font-bold mt-0.5 px-1.5 py-0.5 rounded-full',
-                        hasMyVote ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
-                      )}>
-                        {voteCount.count}
-                      </span>
-                    ) : null}
-                  </button>
+                      <span className="text-base mb-1">📅</span>
+                    ) : !isPast ? (
+                      <button
+                        onClick={(e) => handleVoteClick(e, day)}
+                        disabled={isLoading}
+                        className={cn(
+                          'mb-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all',
+                          hasMyVote
+                            ? 'bg-blue-500 text-white hover:bg-blue-600'
+                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        )}
+                      >
+                        {hasMyVote ? (
+                          <span className="flex items-center gap-0.5">
+                            <Check className="w-2.5 h-2.5" />
+                            {voteCount?.count || 1}
+                          </span>
+                        ) : (
+                          voteCount?.count ? `투표 ${voteCount.count}` : '투표'
+                        )}
+                      </button>
+                    ) : (
+                      <span className="mb-1 h-5" /> // 빈 공간
+                    )}
+                  </div>
                 );
               })}
             </div>
 
-            <div className="mt-4 flex items-center gap-4 text-sm text-gray-600">
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-600">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-100 rounded" />
-                <span>내가 투표한 날</span>
+                <span className="px-1.5 py-0.5 bg-blue-500 text-white text-[10px] rounded-full">투표</span>
+                <span>내가 투표함</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-100 rounded flex items-center justify-center">📅</div>
+                <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 text-[10px] rounded-full">투표</span>
+                <span>투표 가능</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>📅</span>
                 <span>확정된 일정</span>
               </div>
             </div>
@@ -712,37 +733,64 @@ export default function SchedulePage() {
                   </div>
                 )}
               </div>
-            ) : selectedDate && selectedVoteCount ? (
-              // Voting view
+            ) : selectedDate ? (
+              // 날짜 선택됨 (확정되지 않은 날짜)
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-lg font-semibold">
-                  <Users className="w-5 h-5 text-blue-600" />
-                  <span>{selectedVoteCount.count}명 투표</span>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">투표한 멤버:</p>
-                  <ul className="space-y-1">
-                    {selectedVoteCount.users.map((name, index) => (
-                      <li key={index} className="text-sm text-gray-600 flex items-center gap-2">
-                        <Check className="w-4 h-4 text-green-500" />
-                        {name}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {isAdmin && selectedVoteCount.count > 0 && (
-                  <Button onClick={() => setShowConfirmModal(true)} className="w-full mt-4">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    이 날짜로 확정
+                {/* 내 투표 버튼 */}
+                {selectedDate >= new Date(new Date().setHours(0, 0, 0, 0)) && (
+                  <Button
+                    onClick={(e) => handleVoteClick(e as any, selectedDate)}
+                    disabled={isLoading}
+                    variant={selectedVoteCount?.hasMyVote ? 'primary' : 'outline'}
+                    className="w-full"
+                  >
+                    {selectedVoteCount?.hasMyVote ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        투표 완료 (클릭하여 취소)
+                      </>
+                    ) : (
+                      <>
+                        <Vote className="w-4 h-4 mr-2" />
+                        이 날짜에 투표하기
+                      </>
+                    )}
                   </Button>
                 )}
+
+                {/* 투표 현황 */}
+                {selectedVoteCount && selectedVoteCount.count > 0 ? (
+                  <>
+                    <div className="flex items-center gap-2 text-lg font-semibold">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      <span>{selectedVoteCount.count}명 투표</span>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-2">투표한 멤버:</p>
+                      <ul className="space-y-1">
+                        {selectedVoteCount.users.map((name, index) => (
+                          <li key={index} className="text-sm text-gray-600 flex items-center gap-2">
+                            <Check className="w-4 h-4 text-green-500" />
+                            {name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {isAdmin && (
+                      <Button onClick={() => setShowConfirmModal(true)} className="w-full mt-4">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        이 날짜로 확정
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">아직 투표가 없습니다</p>
+                )}
               </div>
-            ) : selectedDate ? (
-              <p className="text-gray-500">아직 투표가 없습니다</p>
             ) : (
-              <p className="text-gray-500">달력에서 날짜를 클릭하여 투표하세요</p>
+              <p className="text-gray-500">달력에서 날짜를 클릭하여 정보를 확인하세요</p>
             )}
           </CardContent>
         </Card>
@@ -802,9 +850,9 @@ export default function SchedulePage() {
       <Card>
         <CardContent className="py-4">
           <p className="text-sm text-gray-600">
-            <strong>사용 방법:</strong> 참석 가능한 날짜를 클릭하여 투표하세요.
+            <strong>사용 방법:</strong> 날짜를 클릭하면 정보를 볼 수 있고, 투표 버튼을 눌러 참석 투표를 할 수 있습니다.
             확정된 일정(📅)을 클릭하면 후보 도서를 보고 투표할 수 있습니다.
-            {isAdmin && ' 관리자는 투표가 많은 날짜를 선택하여 일정을 확정할 수 있습니다.'}
+            {isAdmin && ' 관리자는 투표가 있는 날짜를 선택하여 일정을 확정할 수 있습니다.'}
           </p>
         </CardContent>
       </Card>
