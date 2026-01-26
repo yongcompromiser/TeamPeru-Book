@@ -1,4 +1,27 @@
-export type UserRole = 'admin' | 'member';
+export type UserRole = 'admin' | 'member' | 'visitor' | 'pending';
+
+// 책 상태 타입 (확장 가능)
+export type BookStatus =
+  | 'waiting'    // 대기중 - 새로 등록된 책
+  | 'nominated'  // 후보 경험 - 후보에 올랐으나 선정되지 않음
+  | 'selected'   // 선정됨 - 토론 도서로 선정되어 토론 예정
+  | 'completed'; // 토론 완료
+
+// 책 상태 라벨 (UI 표시용)
+export const BOOK_STATUS_LABELS: Record<BookStatus, string> = {
+  waiting: '대기중',
+  nominated: '후보 경험',
+  selected: '선정됨',
+  completed: '토론 완료',
+};
+
+// 책 상태 색상 (UI 표시용)
+export const BOOK_STATUS_COLORS: Record<BookStatus, { bg: string; text: string }> = {
+  waiting: { bg: 'bg-gray-100', text: 'text-gray-700' },
+  nominated: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  selected: { bg: 'bg-blue-100', text: 'text-blue-700' },
+  completed: { bg: 'bg-green-100', text: 'text-green-700' },
+};
 
 export interface Profile {
   id: string;
@@ -17,6 +40,7 @@ export interface Book {
   cover_url?: string;
   description?: string;
   isbn?: string;
+  status: BookStatus;
   created_by: string;
   created_at: string;
   updated_at: string;
