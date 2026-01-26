@@ -356,6 +356,39 @@ export default function SchedulePage() {
     }
   };
 
+  const handleCancelSchedule = async () => {
+    if (!selectedSchedule || !isAdmin) return;
+
+    if (!confirm('정말 이 일정을 취소하시겠습니까?')) return;
+
+    // 관련 book_votes 삭제
+    await supabase
+      .from('book_votes')
+      .delete()
+      .eq('schedule_id', selectedSchedule.id);
+
+    // 관련 schedule_book_candidates 삭제
+    await supabase
+      .from('schedule_book_candidates')
+      .delete()
+      .eq('schedule_id', selectedSchedule.id);
+
+    // schedule 삭제
+    const { error } = await supabase
+      .from('schedules')
+      .delete()
+      .eq('id', selectedSchedule.id);
+
+    if (!error) {
+      alert('일정이 취소되었습니다.');
+      setSelectedSchedule(null);
+      setSelectedDate(null);
+      await fetchSchedules();
+    } else {
+      alert('일정 취소에 실패했습니다.');
+    }
+  };
+
   const days = eachDayOfInterval({
     start: startOfMonth(currentDate),
     end: endOfMonth(currentDate),
@@ -493,6 +526,14 @@ export default function SchedulePage() {
                     <p className="text-sm text-green-700 mt-1">
                       선정 도서: {selectedSchedule.selected_book.title}
                     </p>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={handleCancelSchedule}
+                      className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                    >
+                      일정 취소
+                    </button>
                   )}
                 </div>
 
