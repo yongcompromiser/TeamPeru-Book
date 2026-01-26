@@ -25,40 +25,36 @@ export function Header({ onMenuClick }: HeaderProps) {
   useEffect(() => {
     const supabase = createClient();
 
-    // getSession으로 빠르게 세션 확인 (getUser 대신)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const loadProfile = async (userId: string) => {
+      console.log('Loading profile for:', userId);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('name, avatar_url, role')
+        .eq('id', userId)
+        .single();
+
+      console.log('Profile result:', data, 'Error:', error?.message);
+      return data;
+    };
+
+    // getSession으로 빠르게 세션 확인
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('Session loaded:', session?.user?.email);
       if (session?.user) {
         setUser(session.user);
-        // Profile 로드
-        supabase
-          .from('profiles')
-          .select('name, avatar_url, role')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data, error }) => {
-            console.log('Profile loaded:', data, error?.message);
-            if (data) setProfile(data);
-            setIsLoading(false);
-          });
-      } else {
-        setIsLoading(false);
+        const profileData = await loadProfile(session.user.id);
+        if (profileData) setProfile(profileData);
       }
+      setIsLoading(false);
     });
 
     // Auth state 변경 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.email);
       if (session?.user) {
         setUser(session.user);
-        supabase
-          .from('profiles')
-          .select('name, avatar_url, role')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setProfile(data);
-          });
+        const profileData = await loadProfile(session.user.id);
+        if (profileData) setProfile(profileData);
       } else {
         setUser(null);
         setProfile(null);
