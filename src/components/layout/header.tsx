@@ -26,68 +26,59 @@ export function Header({ onMenuClick }: HeaderProps) {
     const supabase = createClient();
     let isMounted = true;
 
-    const loadProfile = async (userId: string) => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('name, avatar_url, role')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Profile load error:', error.message);
-      }
-      return data;
-    };
-
-    const initSession = async () => {
+    const loadProfile = async (userId: string): Promise<Profile | null> => {
       try {
-        // 세션 가져오기
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('name, avatar_url, role')
+          .eq('id', userId)
+          .single();
 
         if (error) {
-          console.error('Session error:', error.message);
-          if (isMounted) setIsLoading(false);
-          return;
+          console.error('Profile load error:', error.message);
+          return null;
         }
-
-        if (session?.user && isMounted) {
-          setUser(session.user);
-          const profileData = await loadProfile(session.user.id);
-          if (profileData && isMounted) setProfile(profileData);
-        }
-
-        if (isMounted) setIsLoading(false);
+        return data;
       } catch (err) {
-        console.error('Init session error:', err);
-        if (isMounted) setIsLoading(false);
+        console.error('Profile load exception:', err);
+        return null;
       }
     };
 
-    // 초기 세션 로드
-    initSession();
-
-    // Auth state 변경 감지
+    // Auth state 변경 감지 - 이것만 사용
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth event:', event);
+      console.log('Auth event:', event, session?.user?.email);
 
       if (!isMounted) return;
 
-      if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT' || !session?.user) {
         setUser(null);
         setProfile(null);
+        setIsLoading(false);
         return;
       }
 
-      if (session?.user) {
-        setUser(session.user);
-        const profileData = await loadProfile(session.user.id);
-        if (profileData && isMounted) setProfile(profileData);
+      // INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED 등
+      setUser(session.user);
+      const profileData = await loadProfile(session.user.id);
+      if (isMounted) {
+        setProfile(profileData);
+        setIsLoading(false);
       }
     });
+
+    // 타임아웃 - 3초 후에도 로딩 중이면 강제로 해제
+    const timeout = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.log('Header loading timeout');
+        setIsLoading(false);
+      }
+    }, 3000);
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      clearTimeout(timeout);
     };
   }, []);
 
