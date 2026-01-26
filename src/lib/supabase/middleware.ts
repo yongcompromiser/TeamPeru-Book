@@ -27,16 +27,27 @@ export async function updateSession(request: NextRequest) {
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              // 쿠키 설정 강화
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production',
+            })
           );
         },
       },
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 중요: getUser() 전에 getSession()을 호출하여 토큰 갱신
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // 세션이 있으면 getUser()로 검증
+  let user = session?.user ?? null;
+  if (session) {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  }
 
   const isAuthPage =
     request.nextUrl.pathname.startsWith('/login') ||

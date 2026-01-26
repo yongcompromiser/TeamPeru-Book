@@ -24,45 +24,69 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   useEffect(() => {
     const supabase = createClient();
+    let isMounted = true;
 
     const loadProfile = async (userId: string) => {
-      console.log('Loading profile for:', userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('name, avatar_url, role')
         .eq('id', userId)
         .single();
 
-      console.log('Profile result:', data, 'Error:', error?.message);
+      if (error) {
+        console.error('Profile load error:', error.message);
+      }
       return data;
     };
 
-    // getSession으로 빠르게 세션 확인
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('Session loaded:', session?.user?.email);
-      if (session?.user) {
-        setUser(session.user);
-        const profileData = await loadProfile(session.user.id);
-        if (profileData) setProfile(profileData);
+    const initSession = async () => {
+      try {
+        // 세션 가져오기
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('Session error:', error.message);
+          if (isMounted) setIsLoading(false);
+          return;
+        }
+
+        if (session?.user && isMounted) {
+          setUser(session.user);
+          const profileData = await loadProfile(session.user.id);
+          if (profileData && isMounted) setProfile(profileData);
+        }
+
+        if (isMounted) setIsLoading(false);
+      } catch (err) {
+        console.error('Init session error:', err);
+        if (isMounted) setIsLoading(false);
       }
-      setIsLoading(false);
-    });
+    };
+
+    // 초기 세션 로드
+    initSession();
 
     // Auth state 변경 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
+      console.log('Auth event:', event);
+
+      if (!isMounted) return;
+
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+        return;
+      }
+
       if (session?.user) {
         setUser(session.user);
         const profileData = await loadProfile(session.user.id);
-        if (profileData) setProfile(profileData);
-      } else {
-        setUser(null);
-        setProfile(null);
+        if (profileData && isMounted) setProfile(profileData);
       }
-      setIsLoading(false);
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
