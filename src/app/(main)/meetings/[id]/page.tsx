@@ -20,6 +20,10 @@ import {
   Loader2,
   MessageSquare,
   Mic,
+  Check,
+  X,
+  FileText,
+  Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,7 +45,26 @@ interface Submission {
   discussion: string | null;
   one_liner: string | null;
   rating: number | null;
+  created_at: string;
   profile?: { name: string; avatar_url?: string };
+}
+
+interface SubmissionStatus {
+  user_id: string;
+  user_name: string;
+  has_submitted: boolean;
+  char_count: number;
+  has_rating: boolean;
+  has_one_liner: boolean;
+}
+
+interface Comment {
+  id: string;
+  submission_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profile?: { name: string };
 }
 
 interface MeetingRecord {
@@ -62,7 +85,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [submissionStatuses, setSubmissionStatuses] = useState<SubmissionStatus[]>([]);
   const [mySubmission, setMySubmission] = useState<Submission | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [records, setRecords] = useState<MeetingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -74,10 +99,13 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
 
+  // 댓글 상태
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
   const isAdmin = profile?.role === 'admin';
   const isPresenter = schedule?.presenter_id === user?.id;
   const canReveal = isAdmin || isPresenter;
-  // 모임 당일 또는 이후에 공개 가능
   const meetingDay = schedule ? new Date(schedule.meeting_date) : null;
   const today = new Date();
   const isOnOrAfterMeetingDay = meetingDay
@@ -127,14 +155,19 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
     setSchedule({ ...scheduleData, presenter, selected_book });
 
-    // 제출물 조회 (공개된 경우 전체, 아니면 본인 것만)
+    // 모든 멤버 조회
+    const { data: allMembers } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .in('role', ['admin', 'member']);
+
+    // 제출물 조회
     const { data: submissionsData } = await supabase
       .from('meeting_submissions')
       .select('*, profile:profiles(name, avatar_url)')
       .eq('schedule_id', id);
 
     if (submissionsData) {
-      // 본인 제출물 찾기
       const mine = submissionsData.find(s => s.user_id === user?.id);
       if (mine) {
         setMySubmission(mine);
@@ -143,12 +176,40 @@ export default function MeetingDetailPage({ params }: PageProps) {
         setRating(mine.rating || 0);
       }
 
-      // 공개된 경우에만 다른 사람 제출물 표시
+      // 공개된 경우 전체 표시
       if (scheduleData.is_revealed) {
         setSubmissions(submissionsData);
+
+        // 댓글 조회
+        const submissionIds = submissionsData.map(s => s.id);
+        if (submissionIds.length > 0) {
+          const { data: commentsData } = await supabase
+            .from('submission_comments')
+            .select('*, profile:profiles(name)')
+            .in('submission_id', submissionIds)
+            .order('created_at', { ascending: true });
+          setComments(commentsData || []);
+        }
       } else {
         setSubmissions(mine ? [mine] : []);
       }
+
+      // 제출 현황 (공개 전에도 표시)
+      const statuses: SubmissionStatus[] = (allMembers || []).map(member => {
+        const submission = submissionsData.find(s => s.user_id === member.id);
+        const charCount = submission
+          ? (submission.discussion?.length || 0) + (submission.one_liner?.length || 0)
+          : 0;
+        return {
+          user_id: member.id,
+          user_name: member.name,
+          has_submitted: !!submission,
+          char_count: charCount,
+          has_rating: !!submission?.rating,
+          has_one_liner: !!submission?.one_liner,
+        };
+      });
+      setSubmissionStatuses(statuses);
     }
 
     // 모임 기록 조회
@@ -176,13 +237,11 @@ export default function MeetingDetailPage({ params }: PageProps) {
     };
 
     if (mySubmission) {
-      // 업데이트
       await supabase
         .from('meeting_submissions')
         .update(submissionData)
         .eq('id', mySubmission.id);
     } else {
-      // 새로 생성
       await supabase
         .from('meeting_submissions')
         .insert(submissionData);
@@ -201,7 +260,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
     setIsRevealing(true);
 
-    // 책 상태를 completed로 변경
     if (schedule.selected_book_id) {
       await supabase
         .from('books')
@@ -209,7 +267,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
         .eq('id', schedule.selected_book_id);
     }
 
-    // 모임 공개
     await supabase
       .from('schedules')
       .update({ is_revealed: true })
@@ -219,7 +276,23 @@ export default function MeetingDetailPage({ params }: PageProps) {
     setIsRevealing(false);
   };
 
-  // 별점 렌더링 (0.5 단위)
+  const handleAddComment = async (submissionId: string) => {
+    const content = commentInputs[submissionId]?.trim();
+    if (!content || !user) return;
+
+    setIsSubmittingComment(true);
+
+    await supabase.from('submission_comments').insert({
+      submission_id: submissionId,
+      user_id: user.id,
+      content,
+    });
+
+    setCommentInputs(prev => ({ ...prev, [submissionId]: '' }));
+    await fetchMeetingData();
+    setIsSubmittingComment(false);
+  };
+
   const renderStars = (value: number, interactive: boolean = false) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
@@ -253,6 +326,10 @@ export default function MeetingDetailPage({ params }: PageProps) {
     return <div className="flex gap-1">{stars}</div>;
   };
 
+  const getCommentsForSubmission = (submissionId: string) => {
+    return comments.filter(c => c.submission_id === submissionId);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -273,6 +350,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
   }
 
   const meetingDate = new Date(schedule.meeting_date);
+  const submittedCount = submissionStatuses.filter(s => s.has_submitted).length;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -288,7 +366,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
       <Card>
         <CardContent className="p-6">
           <div className="flex gap-6">
-            {/* 책 이미지 */}
             <div className="flex-shrink-0 w-24 h-36 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 shadow-md">
               {schedule.selected_book?.cover_url ? (
                 <img
@@ -303,7 +380,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
               )}
             </div>
 
-            {/* 모임 정보 */}
             <div className="flex-1">
               <div className="flex items-center gap-2 text-gray-600 mb-2">
                 <Calendar className="w-4 h-4" />
@@ -328,7 +404,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
                 </p>
               )}
 
-              {/* 공개 상태 및 버튼 */}
               <div className="mt-4 flex items-center gap-3">
                 {schedule.is_revealed ? (
                   <span className="inline-flex items-center gap-1 text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full">
@@ -346,7 +421,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
                         onClick={handleReveal}
                         disabled={isRevealing || !isOnOrAfterMeetingDay}
                         className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
-                        title={!isOnOrAfterMeetingDay ? '모임 당일부터 공개 가능합니다' : ''}
                       >
                         {isRevealing ? (
                           <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -364,6 +438,56 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
+      {/* 제출 현황 (공개 전에도 표시) */}
+      {!schedule.is_revealed && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              제출 현황 ({submittedCount}/{submissionStatuses.length}명)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {submissionStatuses.map((status) => (
+                <div
+                  key={status.user_id}
+                  className={cn(
+                    "p-3 rounded-lg border-2 transition-all",
+                    status.has_submitted
+                      ? "border-green-200 bg-green-50"
+                      : "border-gray-200 bg-gray-50"
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    {status.has_submitted ? (
+                      <Check className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <X className="w-4 h-4 text-gray-400" />
+                    )}
+                    <span className={cn(
+                      "font-medium text-sm",
+                      status.has_submitted ? "text-green-700" : "text-gray-500"
+                    )}>
+                      {status.user_name}
+                    </span>
+                  </div>
+                  {status.has_submitted && (
+                    <div className="text-xs text-gray-500 space-y-0.5 ml-6">
+                      <p>{status.char_count}자 작성</p>
+                      <div className="flex gap-2">
+                        {status.has_rating && <span className="text-yellow-600">★평점</span>}
+                        {status.has_one_liner && <span className="text-blue-600">한줄평</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 내 발제 작성 (공개 전에만 수정 가능) */}
       {!schedule.is_revealed && user && (
         <Card>
@@ -371,11 +495,10 @@ export default function MeetingDetailPage({ params }: PageProps) {
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
               나의 발제 작성
-              <span className="text-sm font-normal text-gray-500">(다른 사람에게 보이지 않습니다)</span>
+              <span className="text-sm font-normal text-gray-500">(내용은 공개 전까지 숨겨집니다)</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* 평점 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 평점 (0.5점 단위로 클릭)
@@ -394,7 +517,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            {/* 한줄평 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 한줄평
@@ -409,10 +531,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
               />
             </div>
 
-            {/* 발제 내용 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                발제 내용
+                발제 내용 <span className="text-gray-400">({discussion.length}자)</span>
               </label>
               <textarea
                 value={discussion}
@@ -423,16 +544,14 @@ export default function MeetingDetailPage({ params }: PageProps) {
             </div>
 
             <Button onClick={handleSaveSubmission} disabled={isSaving}>
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
+              {isSaving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               {mySubmission ? '수정하기' : '저장하기'}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* 참여자들의 발제 (공개된 경우) */}
+      {/* 참여자들의 발제 (공개된 경우) - 댓글 포함 */}
       {schedule.is_revealed && submissions.length > 0 && (
         <Card>
           <CardHeader>
@@ -441,47 +560,101 @@ export default function MeetingDetailPage({ params }: PageProps) {
               참여자 발제 ({submissions.length}명)
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {submissions.map((submission) => (
-              <div
-                key={submission.id}
-                className="p-4 border rounded-lg bg-gray-50"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                      <User className="w-4 h-4 text-blue-600" />
+          <CardContent className="space-y-6">
+            {submissions.map((submission) => {
+              const submissionComments = getCommentsForSubmission(submission.id);
+              return (
+                <div key={submission.id} className="border rounded-lg overflow-hidden">
+                  {/* 발제 내용 */}
+                  <div className="p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <span className="font-medium text-gray-900">
+                          {submission.profile?.name || '알 수 없음'}
+                        </span>
+                      </div>
+                      {submission.rating && (
+                        <div className="flex items-center gap-1">
+                          {renderStars(submission.rating)}
+                          <span className="text-sm text-gray-600 ml-1">{submission.rating}</span>
+                        </div>
+                      )}
                     </div>
-                    <span className="font-medium text-gray-900">
-                      {submission.profile?.name || '알 수 없음'}
-                    </span>
+
+                    {submission.one_liner && (
+                      <p className="text-blue-600 font-medium mb-2 italic">
+                        "{submission.one_liner}"
+                      </p>
+                    )}
+
+                    {submission.discussion && (
+                      <p className="text-gray-700 whitespace-pre-wrap">
+                        {submission.discussion}
+                      </p>
+                    )}
                   </div>
-                  {submission.rating && (
-                    <div className="flex items-center gap-1">
-                      {renderStars(submission.rating)}
-                      <span className="text-sm text-gray-600 ml-1">{submission.rating}</span>
+
+                  {/* 댓글 영역 */}
+                  <div className="border-t bg-white p-4">
+                    <p className="text-sm font-medium text-gray-700 mb-3">
+                      댓글 {submissionComments.length > 0 && `(${submissionComments.length})`}
+                    </p>
+
+                    {/* 댓글 목록 */}
+                    {submissionComments.length > 0 && (
+                      <div className="space-y-2 mb-3">
+                        {submissionComments.map((comment) => (
+                          <div key={comment.id} className="flex gap-2 text-sm">
+                            <span className="font-medium text-gray-900">
+                              {comment.profile?.name}:
+                            </span>
+                            <span className="text-gray-700">{comment.content}</span>
+                            <span className="text-gray-400 text-xs">
+                              {format(new Date(comment.created_at), 'M/d HH:mm')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 댓글 입력 */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={commentInputs[submission.id] || ''}
+                        onChange={(e) => setCommentInputs(prev => ({
+                          ...prev,
+                          [submission.id]: e.target.value
+                        }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddComment(submission.id);
+                          }
+                        }}
+                        placeholder="댓글을 입력하세요..."
+                        className="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddComment(submission.id)}
+                        disabled={isSubmittingComment || !commentInputs[submission.id]?.trim()}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
                     </div>
-                  )}
+                  </div>
                 </div>
-
-                {submission.one_liner && (
-                  <p className="text-blue-600 font-medium mb-2 italic">
-                    "{submission.one_liner}"
-                  </p>
-                )}
-
-                {submission.discussion && (
-                  <p className="text-gray-700 whitespace-pre-wrap">
-                    {submission.discussion}
-                  </p>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}
 
-      {/* 모임 기록 (음성) */}
+      {/* 모임 기록 */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
