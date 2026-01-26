@@ -27,6 +27,8 @@ export function Header({ onMenuClick }: HeaderProps) {
     let isMounted = true;
 
     const loadProfile = async (userId: string): Promise<Profile | null> => {
+      if (!isMounted) return null;
+
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -35,20 +37,50 @@ export function Header({ onMenuClick }: HeaderProps) {
           .single();
 
         if (error) {
+          // AbortError는 무시 (컴포넌트 언마운트 시 발생)
+          if (error.message?.includes('abort')) return null;
           console.error('Profile load error:', error.message);
           return null;
         }
         return data;
-      } catch (err) {
+      } catch (err: any) {
+        // AbortError는 무시
+        if (err?.name === 'AbortError' || err?.message?.includes('abort')) {
+          return null;
+        }
         console.error('Profile load exception:', err);
         return null;
       }
     };
 
-    // Auth state 변경 감지 - 이것만 사용
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth event:', event, session?.user?.email);
+    // 초기 세션 확인
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
+        if (!isMounted) return;
+
+        if (session?.user) {
+          setUser(session.user);
+          const profileData = await loadProfile(session.user.id);
+          if (isMounted && profileData) {
+            setProfile(profileData);
+          }
+        }
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+        console.error('Init auth error:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Auth state 변경 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
 
       if (event === 'SIGNED_OUT' || !session?.user) {
@@ -58,27 +90,19 @@ export function Header({ onMenuClick }: HeaderProps) {
         return;
       }
 
-      // INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED 등
-      setUser(session.user);
-      const profileData = await loadProfile(session.user.id);
-      if (isMounted) {
-        setProfile(profileData);
-        setIsLoading(false);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setUser(session.user);
+        const profileData = await loadProfile(session.user.id);
+        if (isMounted) {
+          setProfile(profileData);
+          setIsLoading(false);
+        }
       }
     });
-
-    // 타임아웃 - 3초 후에도 로딩 중이면 강제로 해제
-    const timeout = setTimeout(() => {
-      if (isMounted && isLoading) {
-        console.log('Header loading timeout');
-        setIsLoading(false);
-      }
-    }, 3000);
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
-      clearTimeout(timeout);
     };
   }, []);
 
