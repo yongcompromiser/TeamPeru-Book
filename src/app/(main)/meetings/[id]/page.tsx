@@ -77,7 +77,12 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const isAdmin = profile?.role === 'admin';
   const isPresenter = schedule?.presenter_id === user?.id;
   const canReveal = isAdmin || isPresenter;
-  const isPast = schedule ? new Date(schedule.meeting_date) < new Date() : false;
+  // 모임 당일 또는 이후에 공개 가능
+  const meetingDay = schedule ? new Date(schedule.meeting_date) : null;
+  const today = new Date();
+  const isOnOrAfterMeetingDay = meetingDay
+    ? meetingDay.toDateString() <= today.toDateString()
+    : false;
 
   useEffect(() => {
     if (id) {
@@ -336,18 +341,19 @@ export default function MeetingDetailPage({ params }: PageProps) {
                       <EyeOff className="w-4 h-4" />
                       비공개
                     </span>
-                    {canReveal && isPast && (
+                    {canReveal && (
                       <Button
                         onClick={handleReveal}
-                        disabled={isRevealing}
-                        className="bg-green-600 hover:bg-green-700"
+                        disabled={isRevealing || !isOnOrAfterMeetingDay}
+                        className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+                        title={!isOnOrAfterMeetingDay ? '모임 당일부터 공개 가능합니다' : ''}
                       >
                         {isRevealing ? (
                           <Loader2 className="w-4 h-4 animate-spin mr-2" />
                         ) : (
                           <Eye className="w-4 h-4 mr-2" />
                         )}
-                        모임진행 (공개하기)
+                        {isOnOrAfterMeetingDay ? '모임진행 (공개하기)' : '모임 당일 공개 가능'}
                       </Button>
                     )}
                   </>
