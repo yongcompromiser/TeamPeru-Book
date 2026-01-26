@@ -563,74 +563,100 @@ export default function SchedulePage() {
 
                 {/* Book Candidates */}
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                     <Book className="w-4 h-4" />
                     후보 도서
                   </h3>
 
                   {bookCandidates.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {bookCandidates.map((candidate) => (
                         <div
                           key={candidate.id}
                           className={cn(
-                            "p-2 border rounded-lg",
-                            selectedSchedule.selected_book_id === candidate.book_id && "border-green-500 bg-green-50"
+                            "p-3 border-2 rounded-xl transition-all hover:shadow-md",
+                            selectedSchedule.selected_book_id === candidate.book_id
+                              ? "border-green-500 bg-green-50"
+                              : "border-gray-200 hover:border-blue-300"
                           )}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm">{candidate.book.title}</p>
-                              <p className="text-xs text-gray-500">{candidate.book.author}</p>
+                          <div className="flex gap-3">
+                            {/* 책 이미지 */}
+                            <div className="flex-shrink-0 w-14 h-20 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 shadow-sm">
+                              {candidate.book.cover_url ? (
+                                <img
+                                  src={candidate.book.cover_url}
+                                  alt={candidate.book.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-blue-600">
+                                  <Book className="w-6 h-6 text-white" />
+                                </div>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2 ml-2">
-                              <button
-                                onClick={() => handleBookVote(candidate.book_id)}
-                                className={cn(
-                                  "flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
-                                  hasVotedForBook(candidate.book_id)
-                                    ? "bg-blue-500 text-white shadow-sm"
-                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                )}
-                              >
-                                {hasVotedForBook(candidate.book_id) ? (
-                                  <>
-                                    <Check className="w-3 h-3" />
-                                    투표함
-                                  </>
-                                ) : (
-                                  <>
-                                    <Vote className="w-3 h-3" />
-                                    투표
-                                  </>
-                                )}
-                                <span className="ml-1 bg-white/20 px-1.5 rounded">
-                                  {getBookVoteCount(candidate.book_id)}
-                                </span>
-                              </button>
-                              {canManageBooks && !selectedSchedule.selected_book_id && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleSelectFinalBook(candidate.book_id)}
+
+                            {/* 책 정보 */}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-gray-900 line-clamp-1">{candidate.book.title}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">{candidate.book.author}</p>
+
+                              {/* 투표 버튼 */}
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={() => handleBookVote(candidate.book_id)}
+                                  className={cn(
+                                    "flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
+                                    hasVotedForBook(candidate.book_id)
+                                      ? "bg-blue-500 text-white shadow-sm"
+                                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                  )}
                                 >
-                                  선정
-                                </Button>
+                                  {hasVotedForBook(candidate.book_id) ? (
+                                    <>
+                                      <Check className="w-3 h-3" />
+                                      투표함
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Vote className="w-3 h-3" />
+                                      투표
+                                    </>
+                                  )}
+                                  <span className={cn(
+                                    "ml-1 px-1.5 rounded",
+                                    hasVotedForBook(candidate.book_id) ? "bg-white/20" : "bg-gray-200"
+                                  )}>
+                                    {getBookVoteCount(candidate.book_id)}
+                                  </span>
+                                </button>
+                                {canManageBooks && !selectedSchedule.selected_book_id && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleSelectFinalBook(candidate.book_id)}
+                                    className="text-xs h-7"
+                                  >
+                                    선정
+                                  </Button>
+                                )}
+                              </div>
+
+                              {/* 투표자 목록 */}
+                              {getBookVoteCount(candidate.book_id) > 0 && (
+                                <p className="mt-1.5 text-xs text-gray-400">
+                                  {getVotersForBook(candidate.book_id).join(', ')}
+                                </p>
                               )}
                             </div>
                           </div>
-                          {/* 투표자 목록 */}
-                          {getBookVoteCount(candidate.book_id) > 0 && (
-                            <div className="mt-2 text-xs text-gray-500">
-                              투표: {getVotersForBook(candidate.book_id).join(', ')}
-                            </div>
-                          )}
+
                           {canManageBooks && (
                             <button
                               onClick={() => handleRemoveBookCandidate(candidate.id)}
-                              className="text-xs text-red-500 mt-1 hover:underline"
+                              className="text-xs text-red-400 mt-2 hover:text-red-600 hover:underline"
                             >
-                              제거
+                              후보에서 제거
                             </button>
                           )}
                         </div>
@@ -644,22 +670,43 @@ export default function SchedulePage() {
                 {/* Add Book (Admin/Presenter only) */}
                 {canManageBooks && !selectedSchedule.selected_book_id && (
                   <div>
-                    <h3 className="font-medium text-gray-900 mb-2">도서 추가</h3>
-                    <div className="max-h-40 overflow-y-auto space-y-1">
+                    <h3 className="font-medium text-gray-900 mb-3">도서 추가</h3>
+                    <div className="max-h-48 overflow-y-auto space-y-2">
                       {availableBooks
                         .filter(book => !bookCandidates.some(c => c.book_id === book.id))
                         .map((book) => (
                           <button
                             key={book.id}
                             onClick={() => handleAddBookCandidate(book.id)}
-                            className="w-full text-left p-2 text-sm hover:bg-gray-50 rounded border"
+                            className="w-full flex items-center gap-3 p-2 rounded-xl border-2 border-dashed border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
                           >
-                            <p className="font-medium">{book.title}</p>
-                            <p className="text-xs text-gray-500">{book.author}</p>
+                            {/* 책 이미지 */}
+                            <div className="flex-shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 shadow-sm group-hover:shadow-md transition-shadow">
+                              {book.cover_url ? (
+                                <img
+                                  src={book.cover_url}
+                                  alt={book.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-300 to-gray-400">
+                                  <Book className="w-4 h-4 text-white" />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 text-left min-w-0">
+                              <p className="font-medium text-sm text-gray-900 line-clamp-1 group-hover:text-blue-600">{book.title}</p>
+                              <p className="text-xs text-gray-500">{book.author}</p>
+                            </div>
+
+                            <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <span className="text-xs font-medium">+ 추가</span>
+                            </div>
                           </button>
                         ))}
                       {availableBooks.filter(book => !bookCandidates.some(c => c.book_id === book.id)).length === 0 && (
-                        <p className="text-sm text-gray-500">추가할 수 있는 책이 없습니다</p>
+                        <p className="text-sm text-gray-500 text-center py-4">추가할 수 있는 책이 없습니다</p>
                       )}
                     </div>
                   </div>
