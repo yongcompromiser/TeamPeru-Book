@@ -25,54 +25,32 @@ export function Header({ onMenuClick }: HeaderProps) {
   useEffect(() => {
     const supabase = createClient();
 
-    const loadUser = async () => {
-      try {
-        console.log('Loading user...');
-
-        // 타임아웃 추가 (5초)
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), 5000)
-        );
-
-        const userPromise = supabase.auth.getUser();
-
-        const result = await Promise.race([userPromise, timeoutPromise]) as any;
-
-        const userData = result?.data?.user;
-        const error = result?.error;
-
-        console.log('User loaded:', userData?.email, 'Error:', error?.message);
-
-        if (userData) {
-          setUser(userData);
-
-          // Profile 로드
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('name, avatar_url, role')
-            .eq('id', userData.id)
-            .single();
-
-          console.log('Profile loaded:', profileData, 'Error:', profileError?.message);
-          if (profileData) {
-            setProfile(profileData);
-          }
-        }
-      } catch (err) {
-        console.error('Load error:', err);
-      } finally {
+    // getSession으로 빠르게 세션 확인 (getUser 대신)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Session loaded:', session?.user?.email);
+      if (session?.user) {
+        setUser(session.user);
+        // Profile 로드
+        supabase
+          .from('profiles')
+          .select('name, avatar_url, role')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data, error }) => {
+            console.log('Profile loaded:', data, error?.message);
+            if (data) setProfile(data);
+            setIsLoading(false);
+          });
+      } else {
         setIsLoading(false);
       }
-    };
-
-    loadUser();
+    });
 
     // Auth state 변경 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', event, session?.user?.email);
       if (session?.user) {
         setUser(session.user);
-        // Profile도 다시 로드
         supabase
           .from('profiles')
           .select('name, avatar_url, role')
@@ -85,6 +63,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         setUser(null);
         setProfile(null);
       }
+      setIsLoading(false);
     });
 
     return () => {
