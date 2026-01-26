@@ -124,13 +124,47 @@ export default function SchedulePage() {
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('schedules')
-      .select('*, presenter:profiles!schedules_presenter_id_fkey(name), selected_book:books(title, author)')
+      .select('*')
       .gte('meeting_date', start.toISOString())
       .lte('meeting_date', end.toISOString());
 
-    setSchedules(data || []);
+    console.log('Schedules loaded:', data, 'Error:', error?.message);
+
+    if (data) {
+      // presenter와 book 정보 별도로 로드
+      const schedulesWithDetails = await Promise.all(
+        data.map(async (schedule) => {
+          let presenter = null;
+          let selected_book = null;
+
+          if (schedule.presenter_id) {
+            const { data: p } = await supabase
+              .from('profiles')
+              .select('name')
+              .eq('id', schedule.presenter_id)
+              .single();
+            presenter = p;
+          }
+
+          if (schedule.selected_book_id) {
+            const { data: b } = await supabase
+              .from('books')
+              .select('title, author')
+              .eq('id', schedule.selected_book_id)
+              .single();
+            selected_book = b;
+          }
+
+          return { ...schedule, presenter, selected_book };
+        })
+      );
+
+      setSchedules(schedulesWithDetails);
+    } else {
+      setSchedules([]);
+    }
   };
 
   const fetchMembers = async () => {
