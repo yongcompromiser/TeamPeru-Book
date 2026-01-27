@@ -24,6 +24,8 @@ import {
   X,
   FileText,
   Send,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -94,7 +96,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [isRevealing, setIsRevealing] = useState(false);
 
   // 작성 폼 상태
-  const [discussion, setDiscussion] = useState('');
+  const [discussions, setDiscussions] = useState<string[]>(['']);
   const [oneLiner, setOneLiner] = useState('');
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
@@ -171,7 +173,14 @@ export default function MeetingDetailPage({ params }: PageProps) {
       const mine = submissionsData.find(s => s.user_id === user?.id);
       if (mine) {
         setMySubmission(mine);
-        setDiscussion(mine.discussion || '');
+        // discussion이 JSON 배열 형태인지 확인
+        try {
+          const parsed = JSON.parse(mine.discussion || '[]');
+          setDiscussions(Array.isArray(parsed) && parsed.length > 0 ? parsed : ['']);
+        } catch {
+          // 기존 문자열 형태면 배열로 변환
+          setDiscussions(mine.discussion ? [mine.discussion] : ['']);
+        }
         setOneLiner(mine.one_liner || '');
         setRating(mine.rating || 0);
       }
@@ -194,19 +203,27 @@ export default function MeetingDetailPage({ params }: PageProps) {
         setSubmissions(mine ? [mine] : []);
       }
 
-      // 제출 현황 (공개 전에도 표시)
-      const statuses: SubmissionStatus[] = (allMembers || []).map(member => {
-        const submission = submissionsData.find(s => s.user_id === member.id);
-        const charCount = submission
-          ? (submission.discussion?.length || 0) + (submission.one_liner?.length || 0)
-          : 0;
+      // 제출 현황 - 작성한 회원만 표시
+      const statuses: SubmissionStatus[] = submissionsData.map(submission => {
+        const member = (allMembers || []).find(m => m.id === submission.user_id);
+        let charCount = 0;
+        try {
+          const parsed = JSON.parse(submission.discussion || '[]');
+          charCount = Array.isArray(parsed)
+            ? parsed.reduce((sum, d) => sum + (d?.length || 0), 0)
+            : (submission.discussion?.length || 0);
+        } catch {
+          charCount = submission.discussion?.length || 0;
+        }
+        charCount += submission.one_liner?.length || 0;
+
         return {
-          user_id: member.id,
-          user_name: member.name,
-          has_submitted: !!submission,
+          user_id: submission.user_id,
+          user_name: member?.name || '알 수 없음',
+          has_submitted: true,
           char_count: charCount,
-          has_rating: !!submission?.rating,
-          has_one_liner: !!submission?.one_liner,
+          has_rating: !!submission.rating,
+          has_one_liner: !!submission.one_liner,
         };
       });
       setSubmissionStatuses(statuses);
@@ -227,10 +244,16 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
     setIsSaving(true);
 
+    // 빈 발제 제거하고 JSON으로 저장
+    const filteredDiscussions = discussions.filter(d => d.trim());
+    const discussionJson = filteredDiscussions.length > 0
+      ? JSON.stringify(filteredDiscussions)
+      : null;
+
     const submissionData = {
       schedule_id: schedule.id,
       user_id: user.id,
-      discussion: discussion || null,
+      discussion: discussionJson,
       one_liner: oneLiner || null,
       rating: rating || null,
       updated_at: new Date().toISOString(),
@@ -249,6 +272,26 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
     await fetchMeetingData();
     setIsSaving(false);
+  };
+
+  const handleAddDiscussion = () => {
+    setDiscussions([...discussions, '']);
+  };
+
+  const handleRemoveDiscussion = (index: number) => {
+    if (discussions.length > 1) {
+      setDiscussions(discussions.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleDiscussionChange = (index: number, value: string) => {
+    const newDiscussions = [...discussions];
+    newDiscussions[index] = value;
+    setDiscussions(newDiscussions);
+  };
+
+  const getTotalCharCount = () => {
+    return discussions.reduce((sum, d) => sum + d.length, 0);
   };
 
   const handleReveal = async () => {
@@ -533,20 +576,50 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                발제 내용 <span className="text-gray-400">({discussion.length}자)</span>
+                발제 내용 <span className="text-gray-400">(총 {getTotalCharCount()}자)</span>
               </label>
-              <textarea
-                value={discussion}
-                onChange={(e) => setDiscussion(e.target.value)}
-                placeholder="토론하고 싶은 주제나 인상 깊었던 부분을 작성해주세요..."
-                className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-32"
-              />
+              <div className="space-y-3">
+                {discussions.map((disc, index) => (
+                  <div key={index} className="relative">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs text-gray-500">발제 {index + 1}</span>
+                      <span className="text-xs text-gray-400">({disc.length}자)</span>
+                      {discussions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDiscussion(index)}
+                          className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      value={disc}
+                      onChange={(e) => handleDiscussionChange(index, e.target.value)}
+                      placeholder="토론하고 싶은 주제나 인상 깊었던 부분을 작성해주세요..."
+                      className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-24"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <Button onClick={handleSaveSubmission} disabled={isSaving}>
-              {isSaving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              {mySubmission ? '수정하기' : '저장하기'}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleSaveSubmission} disabled={isSaving}>
+                {isSaving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                {mySubmission ? '수정하기' : '저장하기'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddDiscussion}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                발제 추가하기
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -590,11 +663,27 @@ export default function MeetingDetailPage({ params }: PageProps) {
                       </p>
                     )}
 
-                    {submission.discussion && (
-                      <p className="text-gray-700 whitespace-pre-wrap">
-                        {submission.discussion}
-                      </p>
-                    )}
+                    {submission.discussion && (() => {
+                      let discussionList: string[] = [];
+                      try {
+                        const parsed = JSON.parse(submission.discussion);
+                        discussionList = Array.isArray(parsed) ? parsed : [submission.discussion];
+                      } catch {
+                        discussionList = [submission.discussion];
+                      }
+                      return (
+                        <div className="space-y-3">
+                          {discussionList.map((disc, idx) => (
+                            <div key={idx}>
+                              {discussionList.length > 1 && (
+                                <p className="text-xs text-gray-500 mb-1">발제 {idx + 1}</p>
+                              )}
+                              <p className="text-gray-700 whitespace-pre-wrap">{disc}</p>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* 댓글 영역 */}

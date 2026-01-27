@@ -26,54 +26,69 @@ export function Header({ onMenuClick }: HeaderProps) {
     const supabase = createClient();
     let isMounted = true;
 
-    const loadProfile = async (userId: string): Promise<Profile | null> => {
-      if (!isMounted) return null;
-
+    // 쿠키 삭제 함수
+    const clearAllCookies = () => {
+      document.cookie.split(";").forEach((c) => {
+        const eqPos = c.indexOf("=");
+        const name = eqPos > -1 ? c.substring(0, eqPos) : c;
+        document.cookie = name.trim() + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+      });
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('name, avatar_url, role')
-          .eq('id', userId)
-          .single();
-
-        if (error) {
-          // AbortError는 무시 (컴포넌트 언마운트 시 발생)
-          if (error.message?.includes('abort')) return null;
-          console.error('Profile load error:', error.message);
-          return null;
-        }
-        return data;
-      } catch (err: any) {
-        // AbortError는 무시
-        if (err?.name === 'AbortError' || err?.message?.includes('abort')) {
-          return null;
-        }
-        console.error('Profile load exception:', err);
-        return null;
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (e) {
+        // 무시
       }
     };
 
-    // 초기 세션 확인
+    // 강제 로그아웃 및 리다이렉트
+    const forceLogout = () => {
+      if (window.location.pathname.startsWith('/login')) {
+        // 이미 로그인 페이지면 로딩만 끝내기
+        setIsLoading(false);
+        return;
+      }
+      clearAllCookies();
+      window.location.href = '/login';
+    };
+
+    // 2초 타임아웃 - 로딩 완료 안 되면 강제 로그아웃
+    const loadingTimeout = setTimeout(() => {
+      if (isMounted) {
+        forceLogout();
+      }
+    }, 2000);
+
+    // 세션 확인
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { user: authUser }, error } = await supabase.auth.getUser();
 
         if (!isMounted) return;
+        clearTimeout(loadingTimeout);
 
-        if (session?.user) {
-          setUser(session.user);
-          const profileData = await loadProfile(session.user.id);
-          if (isMounted && profileData) {
-            setProfile(profileData);
-          }
+        if (error || !authUser) {
+          forceLogout();
+          return;
         }
+
+        setUser(authUser);
+
+        // 프로필 로드
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('name, avatar_url, role')
+          .eq('id', authUser.id)
+          .single();
+
         if (isMounted) {
+          setProfile(profileData);
           setIsLoading(false);
         }
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return;
-        console.error('Init auth error:', err);
-        if (isMounted) setIsLoading(false);
+      } catch (err) {
+        if (!isMounted) return;
+        clearTimeout(loadingTimeout);
+        forceLogout();
       }
     };
 
@@ -92,16 +107,25 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         setUser(session.user);
-        const profileData = await loadProfile(session.user.id);
-        if (isMounted) {
-          setProfile(profileData);
-          setIsLoading(false);
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('name, avatar_url, role')
+            .eq('id', session.user.id)
+            .single();
+          if (isMounted) {
+            setProfile(profileData);
+            setIsLoading(false);
+          }
+        } catch {
+          // 무시
         }
       }
     });
 
     return () => {
       isMounted = false;
+      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
     };
   }, []);

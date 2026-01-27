@@ -39,14 +39,22 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // 중요: getUser() 전에 getSession()을 호출하여 토큰 갱신
-  const { data: { session } } = await supabase.auth.getSession();
+  // getUser()로 실제 유효한 사용자인지 검증 (토큰 만료 등 체크)
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-  // 세션이 있으면 getUser()로 검증
-  let user = session?.user ?? null;
-  if (session) {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
+  // 토큰이 만료되었거나 유효하지 않으면 쿠키 삭제
+  if (userError || !user) {
+    // 만료된 쿠키가 있으면 삭제
+    const authCookies = request.cookies.getAll().filter(c =>
+      c.name.includes('supabase') || c.name.includes('sb-')
+    );
+
+    if (authCookies.length > 0) {
+      // 쿠키 삭제
+      authCookies.forEach(({ name }) => {
+        supabaseResponse.cookies.delete(name);
+      });
+    }
   }
 
   const isAuthPage =
