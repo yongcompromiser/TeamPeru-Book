@@ -29,6 +29,8 @@ interface Schedule {
   id: string;
   title: string;
   meeting_date: string;
+  meeting_time?: string;
+  location?: string;
   presenter_id: string | null;
   selected_book_id: string | null;
   status: string;
@@ -80,14 +82,62 @@ export default function SchedulePage() {
   const [bookVotes, setBookVotes] = useState<BookVote[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
 
+  // Time/Location editing states
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editMeetingTime, setEditMeetingTime] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
+    fetchAllData();
+  }, [currentDate, user]);
+
+  const fetchAllData = async () => {
+    // API를 통해 먼저 시도
+    try {
+      const res = await fetch(`/api/schedule?date=${currentDate.toISOString()}`);
+      if (res.ok) {
+        const data = await res.json();
+
+        // 투표 데이터 처리
+        const voteData = (data.votes || []) as Vote[];
+        setVotes(voteData);
+
+        const counts = new Map<string, VoteCount>();
+        voteData.forEach((vote) => {
+          const dateKey = vote.vote_date;
+          const existing = counts.get(dateKey) || {
+            date: dateKey,
+            count: 0,
+            users: [],
+            hasMyVote: false,
+          };
+          existing.count++;
+          existing.users.push(vote.profile?.name || '');
+          if (vote.user_id === data.currentUserId) {
+            existing.hasMyVote = true;
+          }
+          counts.set(dateKey, existing);
+        });
+        setVoteCounts(counts);
+
+        setSchedules(data.schedules || []);
+        setMembers(data.members || []);
+        setAvailableBooks(data.availableBooks || []);
+        return;
+      }
+    } catch (e) {
+      console.log('API fetch failed, trying direct');
+    }
+
+    // API 실패시 직접 호출
     fetchVotes();
     fetchSchedules();
     fetchMembers();
     fetchAvailableBooks();
-  }, [currentDate, user]);
+  };
 
   const fetchVotes = async () => {
     const start = startOfMonth(currentDate);
@@ -134,9 +184,8 @@ export default function SchedulePage() {
     console.log('Schedules loaded:', data, 'Error:', error?.message);
 
     if (data) {
-      // presenter와 book 정보 별도로 로드
       const schedulesWithDetails = await Promise.all(
-        data.map(async (schedule) => {
+        data.map(async (schedule: Schedule) => {
           let presenter = null;
           let selected_book = null;
 
@@ -182,6 +231,19 @@ export default function SchedulePage() {
   };
 
   const fetchBookCandidates = async (scheduleId: string) => {
+    try {
+      const res = await fetch(`/api/schedule/books?scheduleId=${scheduleId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBookCandidates(data.candidates || []);
+        setBookVotes(data.votes || []);
+        return;
+      }
+    } catch (e) {
+      console.log('API fetch failed, trying direct');
+    }
+
+    // Fallback to direct Supabase
     const { data } = await supabase
       .from('schedule_book_candidates')
       .select('*, book:books(*)')
@@ -193,16 +255,15 @@ export default function SchedulePage() {
       .select('book_id, user_id')
       .eq('schedule_id', scheduleId);
 
-    // 투표자 이름 가져오기
     if (votes && votes.length > 0) {
-      const userIds = [...new Set(votes.map(v => v.user_id))];
+      const userIds = [...new Set(votes.map((v: { user_id: string }) => v.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, name')
         .in('id', userIds);
 
-      const profileMap = new Map(profiles?.map(p => [p.id, p.name]) || []);
-      const votesWithNames = votes.map(v => ({
+      const profileMap = new Map(profiles?.map((p: { id: string; name: string }) => [p.id, p.name]) || []);
+      const votesWithNames = votes.map((v: { book_id: string; user_id: string }) => ({
         ...v,
         voter_name: profileMap.get(v.user_id) || '알 수 없음'
       }));
@@ -233,7 +294,7 @@ export default function SchedulePage() {
 
   // 투표 버튼 클릭 = 투표/취소
   const handleVoteClick = async (e: React.MouseEvent, day: Date) => {
-    e.stopPropagation(); // 날짜 클릭 이벤트 방지
+    e.stopPropagation();
     if (!user) return;
 
     const dateKey = format(day, 'yyyy-MM-dd');
@@ -241,6 +302,27 @@ export default function SchedulePage() {
 
     setIsLoading(true);
 
+    // API를 통해 먼저 시도
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: voteCount?.hasMyVote ? 'unvote' : 'vote',
+          date: dateKey,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchAllData();
+        setIsLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.log('API vote failed, trying direct');
+    }
+
+    // API 실패시 직접 호출
     if (voteCount?.hasMyVote) {
       await supabase
         .from('schedule_votes')
@@ -256,7 +338,7 @@ export default function SchedulePage() {
         });
     }
 
-    await fetchVotes();
+    await fetchAllData();
     setIsLoading(false);
   };
 
@@ -275,6 +357,30 @@ export default function SchedulePage() {
       return;
     }
 
+    // API를 통해 먼저 시도
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm',
+          date: dateKey,
+          presenterId: selectedPresenter,
+        }),
+      });
+
+      if (res.ok) {
+        alert('일정이 확정되었습니다!');
+        setShowConfirmModal(false);
+        setSelectedPresenter('');
+        await fetchAllData();
+        return;
+      }
+    } catch (e) {
+      console.log('API confirm failed, trying direct');
+    }
+
+    // API 실패시 직접 호출
     const { error } = await supabase.from('schedules').insert({
       title: `${format(selectedDate, 'M월 d일')} 모임`,
       meeting_date: new Date(dateKey).toISOString(),
@@ -288,7 +394,6 @@ export default function SchedulePage() {
       return;
     }
 
-    // Clear votes for this date
     await supabase
       .from('schedule_votes')
       .delete()
@@ -297,13 +402,32 @@ export default function SchedulePage() {
     alert('일정이 확정되었습니다!');
     setShowConfirmModal(false);
     setSelectedPresenter('');
-    await fetchVotes();
-    await fetchSchedules();
+    await fetchAllData();
   };
 
   const handleAddBookCandidate = async (bookId: string) => {
     if (!selectedSchedule) return;
 
+    try {
+      const res = await fetch('/api/schedule/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add_candidate',
+          scheduleId: selectedSchedule.id,
+          bookId,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchBookCandidates(selectedSchedule.id);
+        return;
+      }
+    } catch (e) {
+      console.log('API failed, trying direct');
+    }
+
+    // Fallback
     const { error } = await supabase
       .from('schedule_book_candidates')
       .insert({
@@ -317,14 +441,33 @@ export default function SchedulePage() {
   };
 
   const handleRemoveBookCandidate = async (candidateId: string) => {
+    if (!selectedSchedule) return;
+
+    try {
+      const res = await fetch('/api/schedule/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'remove_candidate',
+          candidateId,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchBookCandidates(selectedSchedule.id);
+        return;
+      }
+    } catch (e) {
+      console.log('API failed, trying direct');
+    }
+
+    // Fallback
     await supabase
       .from('schedule_book_candidates')
       .delete()
       .eq('id', candidateId);
 
-    if (selectedSchedule) {
-      await fetchBookCandidates(selectedSchedule.id);
-    }
+    await fetchBookCandidates(selectedSchedule.id);
   };
 
   const handleBookVote = async (bookId: string) => {
@@ -334,6 +477,26 @@ export default function SchedulePage() {
       v => v.book_id === bookId && v.user_id === user.id
     );
 
+    try {
+      const res = await fetch('/api/schedule/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: existingVote ? 'unvote' : 'vote',
+          scheduleId: selectedSchedule.id,
+          bookId,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchBookCandidates(selectedSchedule.id);
+        return;
+      }
+    } catch (e) {
+      console.log('API failed, trying direct');
+    }
+
+    // Fallback
     if (existingVote) {
       await supabase
         .from('book_votes')
@@ -357,13 +520,33 @@ export default function SchedulePage() {
   const handleSelectFinalBook = async (bookId: string) => {
     if (!selectedSchedule) return;
 
+    try {
+      const res = await fetch('/api/schedule/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'select_book',
+          scheduleId: selectedSchedule.id,
+          bookId,
+        }),
+      });
+
+      if (res.ok) {
+        alert('책이 선정되었습니다!');
+        await fetchAllData();
+        return;
+      }
+    } catch (e) {
+      console.log('API failed, trying direct');
+    }
+
+    // Fallback
     const { error } = await supabase
       .from('schedules')
       .update({ selected_book_id: bookId })
       .eq('id', selectedSchedule.id);
 
     if (!error) {
-      // Update book status
       await supabase
         .from('books')
         .update({ status: 'selected' })
@@ -372,6 +555,43 @@ export default function SchedulePage() {
       alert('책이 선정되었습니다!');
       await fetchSchedules();
       await fetchAvailableBooks();
+    }
+  };
+
+  const handleSaveDetails = async () => {
+    if (!selectedSchedule) return;
+
+    setIsSavingDetails(true);
+
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_details',
+          scheduleId: selectedSchedule.id,
+          meetingTime: editMeetingTime,
+          location: editLocation,
+        }),
+      });
+
+      if (res.ok) {
+        setEditingDetails(false);
+        await fetchAllData();
+        // Update selectedSchedule with new values
+        setSelectedSchedule({
+          ...selectedSchedule,
+          meeting_time: editMeetingTime,
+          location: editLocation,
+        });
+      } else {
+        const data = await res.json();
+        alert(data.error || '저장에 실패했습니다');
+      }
+    } catch (e) {
+      alert('저장에 실패했습니다');
+    } finally {
+      setIsSavingDetails(false);
     }
   };
 
@@ -572,6 +792,16 @@ export default function SchedulePage() {
                       선정 도서: {selectedSchedule.selected_book.title}
                     </p>
                   )}
+                  {selectedSchedule.meeting_time && (
+                    <p className="text-sm text-green-700 mt-1">
+                      시간: {selectedSchedule.meeting_time}
+                    </p>
+                  )}
+                  {selectedSchedule.location && (
+                    <p className="text-sm text-green-700 mt-1">
+                      장소: {selectedSchedule.location}
+                    </p>
+                  )}
                   {isAdmin && (
                     <button
                       onClick={handleCancelSchedule}
@@ -581,6 +811,65 @@ export default function SchedulePage() {
                     </button>
                   )}
                 </div>
+
+                {/* Time/Location Edit (Admin or Presenter) */}
+                {(isAdmin || selectedSchedule.presenter_id === user?.id) && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    {editingDetails ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">시간</label>
+                          <input
+                            type="text"
+                            value={editMeetingTime}
+                            onChange={(e) => setEditMeetingTime(e.target.value)}
+                            placeholder="예: 오후 3시"
+                            className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">장소</label>
+                          <input
+                            type="text"
+                            value={editLocation}
+                            onChange={(e) => setEditLocation(e.target.value)}
+                            placeholder="예: 스타벅스 강남점"
+                            className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleSaveDetails}
+                            disabled={isSavingDetails}
+                            isLoading={isSavingDetails}
+                          >
+                            저장
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setEditingDetails(false)}
+                          >
+                            취소
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setEditMeetingTime(selectedSchedule.meeting_time || '');
+                          setEditLocation(selectedSchedule.location || '');
+                          setEditingDetails(true);
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        시간/장소 {selectedSchedule.meeting_time || selectedSchedule.location ? '수정' : '설정'}
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* Book Candidates */}
                 <div>

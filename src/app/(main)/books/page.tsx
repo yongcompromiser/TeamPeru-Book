@@ -43,6 +43,20 @@ export default function BooksPage() {
   }, []);
 
   const fetchBooks = async () => {
+    // API를 통해 먼저 시도
+    try {
+      const res = await fetch('/api/books');
+      if (res.ok) {
+        const data = await res.json();
+        setBooks(data.books || []);
+        setIsLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.log('API fetch failed, trying direct');
+    }
+
+    // API 실패시 직접 호출
     const { data } = await supabase
       .from('books')
       .select('id, title, author, cover_url, status')

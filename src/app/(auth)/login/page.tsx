@@ -47,8 +47,8 @@ export default function LoginPage() {
       return;
     }
 
-    // 전체 페이지 새로고침으로 세션 확실히 적용
-    window.location.href = '/dashboard';
+    // 로그인 성공
+    router.push('/dashboard');
   };
 
   return (

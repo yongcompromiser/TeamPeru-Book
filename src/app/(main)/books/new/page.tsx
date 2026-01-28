@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,19 +14,34 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookSearch } from '@/components/features/book-search';
 import { ArrowLeft } from 'lucide-react';
 
+const BOOK_CATEGORIES = [
+  '문학/소설',
+  '인문학',
+  '사회과학',
+  '자기계발',
+  '경제/경영',
+  '과학',
+  '예술',
+  '역사',
+  '철학',
+  '에세이',
+  '기타',
+];
+
 const bookSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요'),
   author: z.string().min(1, '저자를 입력해주세요'),
   cover_url: z.string().url('유효한 URL을 입력해주세요').optional().or(z.literal('')),
   description: z.string().optional(),
   isbn: z.string().optional(),
+  category: z.string().optional(),
+  selection_reason: z.string().optional(),
 });
 
 type BookFormData = z.infer<typeof bookSchema>;
 
 export default function NewBookPage() {
   const router = useRouter();
-  const supabase = createClient();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,26 +79,34 @@ export default function NewBookPage() {
     setIsLoading(true);
     setError(null);
 
-    const { data: book, error: insertError } = await supabase
-      .from('books')
-      .insert({
-        title: data.title,
-        author: data.author,
-        cover_url: data.cover_url || null,
-        description: data.description || null,
-        isbn: data.isbn || null,
-        created_by: user.id,
-      })
-      .select()
-      .single();
+    try {
+      const res = await fetch('/api/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: data.title,
+          author: data.author,
+          cover_url: data.cover_url || null,
+          description: data.description || null,
+          isbn: data.isbn || null,
+          category: data.category || null,
+          selection_reason: data.selection_reason || null,
+        }),
+      });
 
-    if (insertError) {
+      const result = await res.json();
+
+      if (!res.ok) {
+        setError(result.error || '책 등록에 실패했습니다');
+        setIsLoading(false);
+        return;
+      }
+
+      router.push(`/books/${result.book.id}`);
+    } catch (err) {
       setError('책 등록에 실패했습니다');
       setIsLoading(false);
-      return;
     }
-
-    router.push(`/books/${book.id}`);
   };
 
   return (
@@ -173,6 +195,27 @@ export default function NewBookPage() {
               </div>
 
               <div className="mt-4">
+                <label
+                  htmlFor="category"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  분야 (선택)
+                </label>
+                <select
+                  id="category"
+                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  {...register('category')}
+                >
+                  <option value="">선택 안함</option>
+                  {BOOK_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-4">
                 <Textarea
                   id="description"
                   label="책 소개 (선택)"
@@ -180,6 +223,17 @@ export default function NewBookPage() {
                   rows={4}
                   error={errors.description?.message}
                   {...register('description')}
+                />
+              </div>
+
+              <div className="mt-4">
+                <Textarea
+                  id="selection_reason"
+                  label="선정 사유 (선택)"
+                  placeholder="이 책을 추천하는 이유를 작성하세요"
+                  rows={3}
+                  error={errors.selection_reason?.message}
+                  {...register('selection_reason')}
                 />
               </div>
             </div>

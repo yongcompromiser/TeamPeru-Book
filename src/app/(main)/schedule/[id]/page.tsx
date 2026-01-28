@@ -49,7 +49,7 @@ export default function ScheduleDetailPage({ params }: ScheduleDetailPageProps) 
 
     if (attendanceData) {
       setAttendances(attendanceData as Attendance[]);
-      const mine = attendanceData.find((a) => a.user_id === user?.id);
+      const mine = attendanceData.find((a: Attendance) => a.user_id === user?.id);
       if (mine) {
         setMyAttendance(mine.status as AttendanceStatus);
       }
@@ -61,7 +61,7 @@ export default function ScheduleDetailPage({ params }: ScheduleDetailPageProps) 
   const handleAttendance = async (status: AttendanceStatus) => {
     if (!user) return;
 
-    const existingAttendance = attendances.find((a) => a.user_id === user.id);
+    const existingAttendance = attendances.find((a: Attendance) => a.user_id === user.id);
 
     if (existingAttendance) {
       await supabase

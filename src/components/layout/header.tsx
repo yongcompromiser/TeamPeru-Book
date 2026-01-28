@@ -1,156 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, Menu, LogOut } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { Avatar } from '@/components/ui/avatar';
-import type { User } from '@supabase/supabase-js';
+import { useAuth } from '@/hooks/use-auth';
 
 interface HeaderProps {
   onMenuClick?: () => void;
 }
 
-interface Profile {
-  name: string;
-  avatar_url?: string;
-  role?: string;
-}
-
 export function Header({ onMenuClick }: HeaderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const supabase = createClient();
-    let isMounted = true;
-
-    // 쿠키 삭제 함수
-    const clearAllCookies = () => {
-      document.cookie.split(";").forEach((c) => {
-        const eqPos = c.indexOf("=");
-        const name = eqPos > -1 ? c.substring(0, eqPos) : c;
-        document.cookie = name.trim() + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-      });
-      try {
-        localStorage.clear();
-        sessionStorage.clear();
-      } catch (e) {
-        // 무시
-      }
-    };
-
-    // 강제 로그아웃 및 리다이렉트
-    const forceLogout = () => {
-      if (window.location.pathname.startsWith('/login')) {
-        // 이미 로그인 페이지면 로딩만 끝내기
-        setIsLoading(false);
-        return;
-      }
-      clearAllCookies();
-      window.location.href = '/login';
-    };
-
-    // 2초 타임아웃 - 로딩 완료 안 되면 강제 로그아웃
-    const loadingTimeout = setTimeout(() => {
-      if (isMounted) {
-        forceLogout();
-      }
-    }, 2000);
-
-    // 세션 확인
-    const initAuth = async () => {
-      try {
-        const { data: { user: authUser }, error } = await supabase.auth.getUser();
-
-        if (!isMounted) return;
-        clearTimeout(loadingTimeout);
-
-        if (error || !authUser) {
-          forceLogout();
-          return;
-        }
-
-        setUser(authUser);
-
-        // 프로필 로드
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('name, avatar_url, role')
-          .eq('id', authUser.id)
-          .single();
-
-        if (isMounted) {
-          setProfile(profileData);
-          setIsLoading(false);
-        }
-      } catch (err) {
-        if (!isMounted) return;
-        clearTimeout(loadingTimeout);
-        forceLogout();
-      }
-    };
-
-    initAuth();
-
-    // Auth state 변경 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
-
-      if (event === 'SIGNED_OUT' || !session?.user) {
-        setUser(null);
-        setProfile(null);
-        setIsLoading(false);
-        return;
-      }
-
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setUser(session.user);
-        try {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('name, avatar_url, role')
-            .eq('id', session.user.id)
-            .single();
-          if (isMounted) {
-            setProfile(profileData);
-            setIsLoading(false);
-          }
-        } catch {
-          // 무시
-        }
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      clearTimeout(loadingTimeout);
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const handleLogout = () => {
-    console.log('Logout clicked');
-
-    // 쿠키 삭제
-    document.cookie.split(";").forEach((c) => {
-      const eqPos = c.indexOf("=");
-      const name = eqPos > -1 ? c.substring(0, eqPos) : c;
-      document.cookie = name.trim() + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-    });
-
-    // 스토리지 클리어
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch (e) {
-      console.error('Storage clear error:', e);
-    }
-
-    console.log('Redirecting to login...');
-    window.location.href = '/login';
-  };
+  const { user, profile, isLoading, logout } = useAuth();
 
   const displayName = profile?.name || user?.email?.split('@')[0] || '';
 
@@ -196,7 +56,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 </Link>
                 <button
                   type="button"
-                  onClick={handleLogout}
+                  onClick={logout}
                   className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
                 >
                   <LogOut className="w-5 h-5" />

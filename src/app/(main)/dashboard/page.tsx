@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
-import { Calendar, BookOpen, MessageSquare, PenTool } from 'lucide-react';
+import { Calendar, BookOpen, User } from 'lucide-react';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -10,227 +10,200 @@ export const dynamic = 'force-dynamic';
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  // Fetch upcoming schedules
-  const { data: schedules } = await supabase
+  // Fetch next upcoming schedule
+  const { data: schedulesData } = await supabase
     .from('schedules')
-    .select('*, book:books(*)')
+    .select('*')
     .gte('meeting_date', new Date().toISOString())
     .order('meeting_date', { ascending: true })
-    .limit(3);
+    .limit(1);
 
-  // Fetch recent discussions
-  const { data: discussions } = await supabase
-    .from('discussions')
-    .select('*, profile:profiles(*), book:books(*)')
-    .order('created_at', { ascending: false })
-    .limit(3);
+  let nextSchedule: any = null;
 
-  // Fetch recent reviews
-  const { data: reviews } = await supabase
-    .from('reviews')
-    .select('*, profile:profiles(*), book:books(*)')
-    .order('created_at', { ascending: false })
-    .limit(3);
+  if (schedulesData && schedulesData.length > 0) {
+    const schedule = schedulesData[0];
 
-  // Get counts
-  const { count: bookCount } = await supabase
-    .from('books')
-    .select('*', { count: 'exact', head: true });
+    // Fetch presenter
+    let presenter = null;
+    if (schedule.presenter_id) {
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', schedule.presenter_id)
+        .single();
+      presenter = p;
+    }
 
-  const { count: discussionCount } = await supabase
-    .from('discussions')
-    .select('*', { count: 'exact', head: true });
+    // Fetch book
+    let book = null;
+    if (schedule.selected_book_id) {
+      const { data: b } = await supabase
+        .from('books')
+        .select('*')
+        .eq('id', schedule.selected_book_id)
+        .single();
+      book = b;
+    }
 
-  const { count: reviewCount } = await supabase
-    .from('reviews')
-    .select('*', { count: 'exact', head: true });
+    nextSchedule = { ...schedule, presenter, book };
+  }
 
-  const { count: scheduleCount } = await supabase
-    .from('schedules')
-    .select('*', { count: 'exact', head: true });
+  // Fetch current/featured book (from next schedule or most recent selected book)
+  let featuredBook = nextSchedule?.book;
+  let featuredPresenter = nextSchedule?.presenter;
+
+  if (!featuredBook) {
+    const { data: booksData } = await supabase
+      .from('books')
+      .select('*')
+      .eq('status', 'selected')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    featuredBook = booksData?.[0] || null;
+  }
 
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="등록된 책"
-          value={bookCount || 0}
-          icon={BookOpen}
-          href="/books"
-        />
-        <StatCard
-          title="모임 일정"
-          value={scheduleCount || 0}
-          icon={Calendar}
-          href="/schedule"
-        />
-        <StatCard
-          title="발제"
-          value={discussionCount || 0}
-          icon={MessageSquare}
-          href="/discussions"
-        />
-        <StatCard
-          title="독후감"
-          value={reviewCount || 0}
-          icon={PenTool}
-          href="/reviews"
-        />
-      </div>
-
       <div className="grid lg:grid-cols-2 gap-8">
-        {/* Upcoming Schedules */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">다가오는 모임</CardTitle>
-            <Link href="/schedule" className="text-sm text-blue-600 hover:underline">
-              전체 보기
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {schedules && schedules.length > 0 ? (
-              <ul className="space-y-4">
-                {schedules.map((schedule) => (
-                  <li key={schedule.id} className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{schedule.title}</p>
-                      <p className="text-sm text-gray-600">
-                        {formatDate(schedule.meeting_date, {
-                          month: 'short',
-                          day: 'numeric',
-                          weekday: 'short',
-                        })}
-                      </p>
-                      {schedule.book && (
-                        <Badge variant="info" className="mt-1">
-                          {schedule.book.title}
-                        </Badge>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500 text-center py-4">예정된 모임이 없습니다</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Discussions */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">최근 발제</CardTitle>
-            <Link href="/discussions" className="text-sm text-blue-600 hover:underline">
-              전체 보기
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {discussions && discussions.length > 0 ? (
-              <ul className="space-y-4">
-                {discussions.map((discussion) => (
-                  <li key={discussion.id}>
-                    <Link
-                      href={`/discussions/${discussion.id}`}
-                      className="block hover:bg-gray-50 -mx-2 px-2 py-2 rounded-lg"
-                    >
-                      <p className="font-medium text-gray-900 truncate">{discussion.title}</p>
-                      <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-                        <span>{discussion.profile?.name}</span>
-                        <span>·</span>
-                        <span>{formatDate(discussion.created_at, { month: 'short', day: 'numeric' })}</span>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500 text-center py-4">발제가 없습니다</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Reviews */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">최근 독후감</CardTitle>
-          <Link href="/reviews" className="text-sm text-blue-600 hover:underline">
-            전체 보기
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {reviews && reviews.length > 0 ? (
-            <ul className="grid md:grid-cols-3 gap-4">
-              {reviews.map((review) => (
-                <li key={review.id}>
-                  <Link
-                    href={`/reviews/${review.id}`}
-                    className="block p-4 border rounded-lg hover:border-blue-300 transition-colors"
-                  >
-                    <p className="font-medium text-gray-900 truncate">{review.title}</p>
-                    <p className="text-sm text-gray-600 mt-1 truncate">
-                      {review.book?.title}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <span
-                            key={i}
-                            className={i < review.rating ? 'text-yellow-400' : 'text-gray-300'}
-                          >
-                            ★
-                          </span>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        {review.profile?.name}
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-gray-500 text-center py-4">독후감이 없습니다</p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  href,
-}: {
-  title: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  href: string;
-}) {
-  return (
-    <Link href={href}>
-      <Card className="hover:border-blue-300 transition-colors">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Icon className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{value}</p>
-              <p className="text-sm text-gray-600">{title}</p>
+        {/* Next Meeting */}
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
+            <div className="flex items-center gap-2 text-white">
+              <Calendar className="w-5 h-5" />
+              <span className="font-medium">다가오는 모임</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </Link>
+          <CardContent className="pt-6">
+            {nextSchedule ? (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {nextSchedule.title}
+                  </h2>
+                  <p className="text-lg text-blue-600 font-medium mt-1">
+                    {formatDate(nextSchedule.meeting_date, {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'long',
+                    })}
+                  </p>
+                </div>
+
+                {nextSchedule.presenter && (
+                  <div className="flex items-center gap-1 text-blue-600">
+                    <User className="w-4 h-4" />
+                    <span>발제자: {nextSchedule.presenter.name}</span>
+                  </div>
+                )}
+
+                {nextSchedule.location && (
+                  <p className="text-gray-600">
+                    장소: {nextSchedule.location}
+                  </p>
+                )}
+
+                {nextSchedule.book && (
+                  <div className="pt-2">
+                    <Badge variant="info" className="text-sm">
+                      {nextSchedule.book.title}
+                    </Badge>
+                  </div>
+                )}
+
+                <Link
+                  href={`/meetings/${nextSchedule.id}`}
+                  className="inline-block mt-2 text-blue-600 hover:underline text-sm"
+                >
+                  자세히 보기 →
+                </Link>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">예정된 모임이 없습니다</p>
+                <Link
+                  href="/schedule"
+                  className="inline-block mt-3 text-blue-600 hover:underline text-sm"
+                >
+                  일정 투표하기
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Featured Book */}
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-4">
+            <div className="flex items-center gap-2 text-white">
+              <BookOpen className="w-5 h-5" />
+              <span className="font-medium">이번 책</span>
+            </div>
+          </div>
+          <CardContent className="pt-6">
+            {featuredBook ? (
+              <div className="flex gap-6">
+                {/* Book Cover */}
+                <div className="flex-shrink-0">
+                  {featuredBook.cover_url ? (
+                    <img
+                      src={featuredBook.cover_url}
+                      alt={featuredBook.title}
+                      className="w-32 h-44 object-cover rounded-lg shadow-md"
+                    />
+                  ) : (
+                    <div className="w-32 h-44 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <BookOpen className="w-12 h-12 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Book Info */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-bold text-gray-900 leading-tight">
+                    {featuredBook.title}
+                  </h2>
+                  <p className="text-gray-600 mt-1">{featuredBook.author}</p>
+
+                  {featuredPresenter && (
+                    <div className="flex items-center gap-1 text-sm text-emerald-600 mt-2">
+                      <User className="w-4 h-4" />
+                      <span>발제자: {featuredPresenter.name}</span>
+                    </div>
+                  )}
+
+                  {featuredBook.description && (
+                    <p className="text-sm text-gray-600 mt-3 line-clamp-3">
+                      {featuredBook.description}
+                    </p>
+                  )}
+
+                  <Link
+                    href={`/books/${featuredBook.id}`}
+                    className="inline-block mt-3 text-emerald-600 hover:underline text-sm"
+                  >
+                    자세히 보기 →
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">선정된 책이 없습니다</p>
+                <Link
+                  href="/books"
+                  className="inline-block mt-3 text-emerald-600 hover:underline text-sm"
+                >
+                  책 목록 보기
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }

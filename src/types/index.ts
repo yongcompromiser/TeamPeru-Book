@@ -40,6 +40,8 @@ export interface Book {
   cover_url?: string;
   description?: string;
   isbn?: string;
+  category?: string;
+  selection_reason?: string;
   status: BookStatus;
   created_by: string;
   created_at: string;

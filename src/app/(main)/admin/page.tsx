@@ -56,7 +56,22 @@ export default function AdminPage() {
   }, [isAdmin]);
 
   const fetchData = async () => {
-    // Fetch all users
+    // 먼저 API를 통해 시도
+    try {
+      const res = await fetch('/api/admin');
+      if (res.ok) {
+        const data = await res.json();
+        const allUsers = (data.users as ProfileWithRole[]) || [];
+        setUsers(allUsers.filter(u => u.role !== 'pending'));
+        setPendingUsers(allUsers.filter(u => u.role === 'pending'));
+        setStats(data.stats);
+        return;
+      }
+    } catch (e) {
+      console.log('API fetch failed, trying direct:', e);
+    }
+
+    // API 실패시 직접 Supabase 호출
     const { data: usersData } = await supabase
       .from('profiles')
       .select('*')

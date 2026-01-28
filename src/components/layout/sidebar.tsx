@@ -5,13 +5,12 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Calendar,
-  MessageSquare,
   BookOpen,
-  PenTool,
   Camera,
   Settings,
   Users,
   X,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Profile } from '@/types';
@@ -27,9 +26,8 @@ const menuItems = [
   { href: '/schedule', label: '일정 투표', icon: Calendar },
   { href: '/meetings', label: '모임 목록', icon: Users },
   { href: '/books', label: '책 목록', icon: BookOpen },
-  { href: '/discussions', label: '발제', icon: MessageSquare },
-  { href: '/reviews', label: '독후감', icon: PenTool },
-  { href: '/recaps', label: '모임 후기', icon: Camera },
+  { href: '/board', label: '자유게시판', icon: MessageCircle },
+  // { href: '/gallery', label: '갤러리', icon: Camera }, // 임시 비활성화
 ];
 
 const adminMenuItems = [

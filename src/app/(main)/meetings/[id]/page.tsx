@@ -16,16 +16,15 @@ import {
   Star,
   Eye,
   EyeOff,
-  Upload,
   Loader2,
   MessageSquare,
-  Mic,
   Check,
   X,
   FileText,
   Send,
   Plus,
   Trash2,
+  MessagesSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -69,11 +68,13 @@ interface Comment {
   profile?: { name: string };
 }
 
-interface MeetingRecord {
+interface MeetingComment {
   id: string;
-  audio_url: string | null;
-  transcript: string | null;
-  summary: string | null;
+  schedule_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profile?: { name: string };
 }
 
 interface PageProps {
@@ -90,7 +91,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [submissionStatuses, setSubmissionStatuses] = useState<SubmissionStatus[]>([]);
   const [mySubmission, setMySubmission] = useState<Submission | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [records, setRecords] = useState<MeetingRecord[]>([]);
+  const [meetingComments, setMeetingComments] = useState<MeetingComment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
@@ -105,6 +106,10 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
+  // 모임 댓글 상태
+  const [meetingCommentInput, setMeetingCommentInput] = useState('');
+  const [isSubmittingMeetingComment, setIsSubmittingMeetingComment] = useState(false);
+
   const isAdmin = profile?.role === 'admin';
   const isPresenter = schedule?.presenter_id === user?.id;
   const canReveal = isAdmin || isPresenter;
@@ -117,11 +122,69 @@ export default function MeetingDetailPage({ params }: PageProps) {
   useEffect(() => {
     if (id) {
       fetchMeetingData();
+      fetchMeetingComments();
     }
   }, [id, user]);
 
   const fetchMeetingData = async () => {
-    // 스케줄 정보
+    // API를 통해 먼저 시도
+    try {
+      const res = await fetch(`/api/meetings/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSchedule(data.schedule);
+
+        if (data.submissions) {
+          const mine = data.submissions.find((s: Submission) => s.user_id === user?.id);
+          if (mine) {
+            setMySubmission(mine);
+            try {
+              const parsed = JSON.parse(mine.discussion || '[]');
+              setDiscussions(Array.isArray(parsed) && parsed.length > 0 ? parsed : ['']);
+            } catch {
+              setDiscussions(mine.discussion ? [mine.discussion] : ['']);
+            }
+            setOneLiner(mine.one_liner || '');
+            setRating(mine.rating || 0);
+          }
+
+          if (data.schedule.is_revealed) {
+            setSubmissions(data.submissions);
+            setComments(data.comments || []);
+          } else {
+            setSubmissions(mine ? [mine] : []);
+          }
+
+          // 제출 현황
+          const statuses: SubmissionStatus[] = data.submissions.map((submission: Submission) => {
+            const member = (data.allMembers || []).find((m: { id: string }) => m.id === submission.user_id);
+            let charCount = 0;
+            try {
+              const parsed = JSON.parse(submission.discussion || '[]');
+              charCount = Array.isArray(parsed) ? parsed.join('').length : (submission.discussion?.length || 0);
+            } catch {
+              charCount = submission.discussion?.length || 0;
+            }
+            return {
+              user_id: submission.user_id,
+              user_name: member?.name || '알 수 없음',
+              has_submitted: true,
+              char_count: charCount,
+              has_rating: !!submission.rating,
+              has_one_liner: !!submission.one_liner,
+            };
+          });
+          setSubmissionStatuses(statuses);
+        }
+
+        setIsLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.log('API fetch failed, trying direct');
+    }
+
+    // API 실패시 직접 호출
     const { data: scheduleData } = await supabase
       .from('schedules')
       .select('*')
@@ -133,7 +196,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
       return;
     }
 
-    // 발제자 정보
     let presenter = null;
     if (scheduleData.presenter_id) {
       const { data: p } = await supabase
@@ -144,7 +206,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
       presenter = p;
     }
 
-    // 책 정보
     let selected_book = null;
     if (scheduleData.selected_book_id) {
       const { data: b } = await supabase
@@ -157,7 +218,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
     setSchedule({ ...scheduleData, presenter, selected_book });
 
-    // 모든 멤버 조회
     const { data: allMembers } = await supabase
       .from('profiles')
       .select('id, name')
@@ -170,7 +230,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
       .eq('schedule_id', id);
 
     if (submissionsData) {
-      const mine = submissionsData.find(s => s.user_id === user?.id);
+      const mine = submissionsData.find((s: Submission) => s.user_id === user?.id);
       if (mine) {
         setMySubmission(mine);
         // discussion이 JSON 배열 형태인지 확인
@@ -190,7 +250,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
         setSubmissions(submissionsData);
 
         // 댓글 조회
-        const submissionIds = submissionsData.map(s => s.id);
+        const submissionIds = submissionsData.map((s: Submission) => s.id);
         if (submissionIds.length > 0) {
           const { data: commentsData } = await supabase
             .from('submission_comments')
@@ -204,8 +264,8 @@ export default function MeetingDetailPage({ params }: PageProps) {
       }
 
       // 제출 현황 - 작성한 회원만 표시
-      const statuses: SubmissionStatus[] = submissionsData.map(submission => {
-        const member = (allMembers || []).find(m => m.id === submission.user_id);
+      const statuses: SubmissionStatus[] = submissionsData.map((submission: Submission) => {
+        const member = (allMembers || []).find((m: { id: string }) => m.id === submission.user_id);
         let charCount = 0;
         try {
           const parsed = JSON.parse(submission.discussion || '[]');
@@ -229,14 +289,48 @@ export default function MeetingDetailPage({ params }: PageProps) {
       setSubmissionStatuses(statuses);
     }
 
-    // 모임 기록 조회
-    const { data: recordsData } = await supabase
-      .from('meeting_records')
-      .select('*')
-      .eq('schedule_id', id);
-
-    setRecords(recordsData || []);
     setIsLoading(false);
+  };
+
+  const fetchMeetingComments = async () => {
+    try {
+      const res = await fetch(`/api/meetings/${id}/comments`);
+      if (res.ok) {
+        const data = await res.json();
+        setMeetingComments(data.comments || []);
+      }
+    } catch (e) {
+      console.log('Failed to fetch meeting comments');
+    }
+  };
+
+  const handleAddMeetingComment = async () => {
+    if (!meetingCommentInput.trim() || !user) return;
+
+    setIsSubmittingMeetingComment(true);
+
+    try {
+      const res = await fetch(`/api/meetings/${id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: meetingCommentInput }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.comment) {
+        setMeetingComments(prev => [...prev, data.comment]);
+        setMeetingCommentInput('');
+      } else {
+        console.error('Meeting comment error:', data.error);
+        alert(data.error || '메시지 전송에 실패했습니다');
+      }
+    } catch (e) {
+      console.error('Failed to add meeting comment:', e);
+      alert('메시지 전송에 실패했습니다');
+    }
+
+    setIsSubmittingMeetingComment(false);
   };
 
   const handleSaveSubmission = async () => {
@@ -250,6 +344,29 @@ export default function MeetingDetailPage({ params }: PageProps) {
       ? JSON.stringify(filteredDiscussions)
       : null;
 
+    // API를 통해 먼저 시도
+    try {
+      const res = await fetch(`/api/meetings/${schedule.id}/submission`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          discussion: discussionJson,
+          one_liner: oneLiner || null,
+          rating: rating || null,
+          submissionId: mySubmission?.id || null,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchMeetingData();
+        setIsSaving(false);
+        return;
+      }
+    } catch (e) {
+      console.log('API save failed, trying direct');
+    }
+
+    // API 실패시 직접 호출
     const submissionData = {
       schedule_id: schedule.id,
       user_id: user.id,
@@ -303,17 +420,34 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
     setIsRevealing(true);
 
-    if (schedule.selected_book_id) {
-      await supabase
-        .from('books')
-        .update({ status: 'completed' })
-        .eq('id', schedule.selected_book_id);
-    }
+    try {
+      const res = await fetch(`/api/meetings/${schedule.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reveal' }),
+      });
 
-    await supabase
-      .from('schedules')
-      .update({ is_revealed: true })
-      .eq('id', schedule.id);
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || '공개 처리에 실패했습니다.');
+        setIsRevealing(false);
+        return;
+      }
+    } catch (e) {
+      console.log('API reveal failed, trying direct');
+      // API 실패시 직접 호출
+      if (schedule.selected_book_id) {
+        await supabase
+          .from('books')
+          .update({ status: 'completed' })
+          .eq('id', schedule.selected_book_id);
+      }
+
+      await supabase
+        .from('schedules')
+        .update({ is_revealed: true })
+        .eq('id', schedule.id);
+    }
 
     await fetchMeetingData();
     setIsRevealing(false);
@@ -743,47 +877,87 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </Card>
       )}
 
-      {/* 모임 기록 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Mic className="w-5 h-5" />
-            모임 기록
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {records.length > 0 ? (
-            <div className="space-y-4">
-              {records.map((record) => (
-                <div key={record.id} className="p-4 border rounded-lg">
-                  {record.audio_url && (
-                    <audio controls className="w-full mb-3">
-                      <source src={record.audio_url} />
-                    </audio>
-                  )}
-                  {record.summary && (
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-2">AI 요약</h4>
-                      <p className="text-gray-700 whitespace-pre-wrap">{record.summary}</p>
+      {/* 모임 기록 채팅 (공개된 경우만) */}
+      {schedule.is_revealed && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MessagesSquare className="w-5 h-5" />
+              모임 기록
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* 채팅 메시지 목록 */}
+            <div className="space-y-3 max-h-96 overflow-y-auto mb-4">
+              {meetingComments.length > 0 ? (
+                meetingComments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className={cn(
+                      "flex gap-3 p-3 rounded-lg",
+                      comment.user_id === user?.id
+                        ? "bg-blue-50 ml-8"
+                        : "bg-gray-50 mr-8"
+                    )}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+                      <User className="w-4 h-4 text-white" />
                     </div>
-                  )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm text-gray-900">
+                          {comment.profile?.name || '알 수 없음'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {format(new Date(comment.created_at), 'M/d HH:mm')}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 text-sm whitespace-pre-wrap break-words">
+                        {comment.content}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <MessagesSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>아직 기록이 없습니다</p>
+                  <p className="text-sm">모임 중 자유롭게 소통하고 기록해보세요!</p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Mic className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p>아직 기록이 없습니다</p>
-              {(isAdmin || isPresenter) && (
-                <Button variant="outline" className="mt-4">
-                  <Upload className="w-4 h-4 mr-2" />
-                  음성 파일 업로드
-                </Button>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* 입력 영역 */}
+            {user && (
+              <div className="flex gap-2 border-t pt-4">
+                <input
+                  type="text"
+                  value={meetingCommentInput}
+                  onChange={(e) => setMeetingCommentInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAddMeetingComment();
+                    }
+                  }}
+                  placeholder="메시지를 입력하세요..."
+                  className="flex-1 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <Button
+                  onClick={handleAddMeetingComment}
+                  disabled={isSubmittingMeetingComment || !meetingCommentInput.trim()}
+                >
+                  {isSubmittingMeetingComment ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
