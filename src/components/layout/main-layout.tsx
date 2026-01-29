@@ -25,7 +25,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     }
   }, [isLoading, user, profile, router]);
 
-  if (isLoading) {
+  if (isLoading || !profile) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
@@ -33,7 +33,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     );
   }
 
-  if (!user) {
+  if (!user || profile.role === 'pending') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
