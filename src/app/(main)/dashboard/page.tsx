@@ -45,7 +45,33 @@ export default async function DashboardPage() {
       book = b;
     }
 
-    nextSchedule = { ...schedule, presenter, book };
+    // Fetch submissions for this schedule
+    const { data: submissions } = await supabase
+      .from('meeting_submissions')
+      .select('user_id, discussion, rating, one_liner, profiles(name)')
+      .eq('schedule_id', schedule.id);
+
+    // Fetch all members (role = member or admin)
+    const { data: members } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .in('role', ['member', 'admin']);
+
+    const submissionMap = new Map(
+      (submissions || []).map((s: any) => [s.user_id, s])
+    );
+
+    const participantStatus = (members || []).map((m: any) => {
+      const sub = submissionMap.get(m.id) as any;
+      return {
+        name: m.name,
+        discussion: !!(sub?.discussion && sub.discussion.trim() !== ''),
+        rating: sub?.rating != null,
+        oneLiner: !!(sub?.one_liner && sub.one_liner.trim() !== ''),
+      };
+    });
+
+    nextSchedule = { ...schedule, presenter, book, participantStatus };
   }
 
   // Fetch current/featured book (from next schedule or most recent selected book)
@@ -110,6 +136,34 @@ export default async function DashboardPage() {
                     <Badge variant="info" className="text-sm">
                       {nextSchedule.book.title}
                     </Badge>
+                  </div>
+                )}
+
+                {nextSchedule.participantStatus && nextSchedule.participantStatus.length > 0 && (
+                  <div className="pt-3 border-t">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">참가자 현황</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-gray-500 text-xs">
+                            <th className="text-left py-1 pr-2">이름</th>
+                            <th className="text-center py-1 px-1">발제</th>
+                            <th className="text-center py-1 px-1">평점</th>
+                            <th className="text-center py-1 px-1">한줄평</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {nextSchedule.participantStatus.map((p: any) => (
+                            <tr key={p.name} className="border-t border-gray-100">
+                              <td className="py-1 pr-2 font-medium text-gray-800">{p.name}</td>
+                              <td className="py-1 px-1 text-center">{p.discussion ? <span className="text-green-600">✓</span> : <span className="text-red-400">✗</span>}</td>
+                              <td className="py-1 px-1 text-center">{p.rating ? <span className="text-green-600">✓</span> : <span className="text-red-400">✗</span>}</td>
+                              <td className="py-1 px-1 text-center">{p.oneLiner ? <span className="text-green-600">✓</span> : <span className="text-red-400">✗</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
 

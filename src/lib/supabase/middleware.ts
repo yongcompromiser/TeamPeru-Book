@@ -28,8 +28,36 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  // 세션 갱신만 수행 (리다이렉트 로직은 클라이언트에서 처리)
-  await supabase.auth.getSession();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+
+  // 로그인하지 않은 사용자: 공개 경로 외 접근 차단
+  const publicPaths = ['/login', '/signup', '/auth', '/pending'];
+  const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
+
+  if (!user && !isPublicPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  // 로그인한 사용자: pending 역할이면 /pending 외 접근 차단
+  if (user && !isPublicPath) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role === 'pending') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/pending';
+      return NextResponse.redirect(url);
+    }
+  }
 
   return supabaseResponse;
 }
