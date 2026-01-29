@@ -48,18 +48,22 @@ export default function LoginPage() {
     }
 
     // 로그인 성공 - pending 상태 확인
-    const { data: { user: loggedInUser } } = await supabase.auth.getUser();
-    if (loggedInUser) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', loggedInUser.id)
-        .single();
+    try {
+      const { data: { user: loggedInUser } } = await supabase.auth.getUser();
+      if (loggedInUser) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', loggedInUser.id)
+          .single();
 
-      if (profile?.role === 'pending') {
-        window.location.href = '/pending';
-        return;
+        if (profile?.role === 'pending') {
+          window.location.href = '/pending';
+          return;
+        }
       }
+    } catch (e) {
+      // profile 조회 실패해도 대시보드로 이동
     }
 
     window.location.href = '/dashboard';
