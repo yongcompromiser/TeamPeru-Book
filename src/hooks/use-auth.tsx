@@ -123,7 +123,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const currentUser = session?.user ?? null;
         setUser(currentUser);
-        setIsLoading(false);
 
         if (currentUser) {
           // 1. 직접 Supabase 호출 시도
@@ -135,9 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             p = await fetchProfile(currentUser.id, true);
           }
 
-          if (mounted) setProfile(p);
+          if (mounted) {
+            setProfile(p);
+            setIsLoading(false);
+          }
         } else {
           setProfile(null);
+          if (mounted) setIsLoading(false);
         }
       }
     );
