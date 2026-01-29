@@ -57,12 +57,12 @@ export default function LoginPage() {
         .single();
 
       if (profile?.role === 'pending') {
-        router.push('/pending');
+        window.location.href = '/pending';
         return;
       }
     }
 
-    router.push('/dashboard');
+    window.location.href = '/dashboard';
   };
 
   return (
