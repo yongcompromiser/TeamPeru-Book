@@ -7,7 +7,7 @@ CREATE TABLE profiles (
   email TEXT NOT NULL,
   name TEXT NOT NULL,
   avatar_url TEXT,
-  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+  role TEXT NOT NULL DEFAULT 'pending' CHECK (role IN ('admin', 'member', 'pending', 'visitor')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -130,7 +130,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-    'member'
+    'pending'
   );
   RETURN NEW;
 END;

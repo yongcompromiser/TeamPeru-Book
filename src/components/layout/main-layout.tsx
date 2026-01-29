@@ -20,7 +20,10 @@ export function MainLayout({ children }: MainLayoutProps) {
     if (!isLoading && !user) {
       router.push('/login');
     }
-  }, [isLoading, user, router]);
+    if (!isLoading && user && profile?.role === 'pending') {
+      router.push('/pending');
+    }
+  }, [isLoading, user, profile, router]);
 
   if (isLoading) {
     return (

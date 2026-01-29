@@ -47,7 +47,21 @@ export default function LoginPage() {
       return;
     }
 
-    // 로그인 성공
+    // 로그인 성공 - pending 상태 확인
+    const { data: { user: loggedInUser } } = await supabase.auth.getUser();
+    if (loggedInUser) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', loggedInUser.id)
+        .single();
+
+      if (profile?.role === 'pending') {
+        router.push('/pending');
+        return;
+      }
+    }
+
     router.push('/dashboard');
   };
 
