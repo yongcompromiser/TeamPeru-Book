@@ -59,25 +59,44 @@ export default function ScheduleDetailPage({ params }: ScheduleDetailPageProps) 
   };
 
   const handleAttendance = async (status: AttendanceStatus) => {
-    if (!user) return;
+    if (!user || !profile) return;
+
+    // 낙관적 업데이트 - 즉시 UI 반영
+    const prevAttendance = myAttendance;
+    const prevAttendances = [...attendances];
+    setMyAttendance(status);
 
     const existingAttendance = attendances.find((a: Attendance) => a.user_id === user.id);
-
     if (existingAttendance) {
-      await supabase
-        .from('attendances')
-        .update({ status })
-        .eq('id', existingAttendance.id);
+      setAttendances(attendances.map(a =>
+        a.user_id === user.id ? { ...a, status } : a
+      ));
     } else {
-      await supabase.from('attendances').insert({
+      setAttendances([...attendances, {
+        id: 'temp-' + Date.now(),
         schedule_id: id,
         user_id: user.id,
         status,
-      });
+        profile,
+      } as any]);
     }
 
-    setMyAttendance(status);
-    fetchData();
+    // 서버에 반영
+    try {
+      const res = await fetch(`/api/schedule/${id}/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('failed');
+      // 서버 응답으로 정확한 데이터 갱신
+      const data = await res.json();
+      if (data.attendances) setAttendances(data.attendances);
+    } catch {
+      // 실패 시 롤백
+      setMyAttendance(prevAttendance);
+      setAttendances(prevAttendances);
+    }
   };
 
   if (isLoading) {
