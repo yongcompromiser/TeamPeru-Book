@@ -36,37 +36,42 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    });
-
-    if (error) {
-      setError('이메일 또는 비밀번호가 올바르지 않습니다');
-      setIsLoading(false);
-      return;
-    }
-
-    // 로그인 성공 - pending 상태 확인
     try {
-      const { data: { user: loggedInUser } } = await supabase.auth.getUser();
-      if (loggedInUser) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', loggedInUser.id)
-          .single();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
 
-        if (profile?.role === 'pending') {
-          window.location.href = '/pending';
-          return;
-        }
+      if (error) {
+        setError('이메일 또는 비밀번호가 올바르지 않습니다');
+        setIsLoading(false);
+        return;
       }
-    } catch (e) {
-      // profile 조회 실패해도 대시보드로 이동
-    }
 
-    window.location.href = '/dashboard';
+      // 로그인 성공 - pending 상태 확인
+      try {
+        const { data: { user: loggedInUser } } = await supabase.auth.getUser();
+        if (loggedInUser) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', loggedInUser.id)
+            .single();
+
+          if (profile?.role === 'pending') {
+            window.location.href = '/pending';
+            return;
+          }
+        }
+      } catch (e) {
+        // profile 조회 실패해도 대시보드로 이동
+      }
+
+      window.location.href = '/dashboard';
+    } catch {
+      setError('로그인 중 오류가 발생했습니다');
+      setIsLoading(false);
+    }
   };
 
   return (

@@ -15,7 +15,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const displayName = profile?.name || user?.email?.split('@')[0] || '';
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+    <header className="bg-[#fffdf9] border-b border-amber-100 sticky top-0 z-30">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Left side */}
@@ -30,7 +30,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             <Link href="/dashboard" className="flex items-center gap-2 ml-2 lg:ml-0">
               <BookOpen className="w-8 h-8 text-blue-600" />
               <span className="text-xl font-bold text-gray-900 hidden sm:block">
-                독서토론
+                팀 페루
               </span>
             </Link>
           </div>

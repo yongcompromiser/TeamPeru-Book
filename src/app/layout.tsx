@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "독서토론 모임",
-  description: "함께 책을 읽고 토론하는 독서모임 플랫폼",
+  title: "팀 페루 독서토론",
+  description: "함께 책을 읽고 토론하는 팀 페루 독서토론",
 };
 
 export default function RootLayout({

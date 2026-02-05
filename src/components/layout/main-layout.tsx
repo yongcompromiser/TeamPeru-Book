@@ -27,22 +27,22 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   if (isLoading || !profile) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+      <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
       </div>
     );
   }
 
   if (!user || profile.role === 'pending') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+      <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#faf8f5]">
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <div className="flex">
         <Sidebar

@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#faf8f5]">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#faf8f5]/90 backdrop-blur-md border-b border-amber-100/50">
         <div className="container mx-auto px-6 py-4">
           <nav className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -14,7 +14,7 @@ export default function Home() {
                 <BookOpen className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                북클럽
+                팀 페루
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -37,7 +37,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-medium mb-8">
               <Sparkles className="w-4 h-4" />
-              함께 성장하는 독서 커뮤니티
+              팀 페루 독서토론
             </div>
 
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-8 leading-tight">
@@ -49,7 +49,7 @@ export default function Home() {
             </h1>
 
             <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed">
-              같은 책을 읽고 다른 생각을 나누며 성장하는 독서토론 모임.
+              같은 책을 읽고 다른 생각을 나누며 성장하는 팀 페루 독서토론.
               <br />
               일정 관리부터 토론 기록까지, 모든 것을 한 곳에서.
             </p>
@@ -66,14 +66,14 @@ export default function Home() {
         </section>
 
         {/* Features */}
-        <section className="bg-gradient-to-b from-gray-50 to-white py-24">
+        <section className="bg-gradient-to-b from-amber-50/50 to-[#faf8f5] py-24">
           <div className="container mx-auto px-6">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold text-gray-900 mb-4">
                 독서모임을 더 즐겁게
               </h2>
               <p className="text-gray-600">
-                북클럽이 제공하는 다양한 기능들을 만나보세요
+                팀 페루가 제공하는 다양한 기능들을 만나보세요
               </p>
             </div>
 
@@ -118,7 +118,7 @@ export default function Home() {
                   지금 바로 시작하세요
                 </h2>
                 <p className="text-blue-100 mb-8 text-lg">
-                  북클럽과 함께 더 의미있는 독서를 경험해보세요
+                  팀 페루와 함께 더 의미있는 독서를 경험해보세요
                 </p>
                 <Link href="/signup">
                   <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 text-lg px-8 py-6 rounded-xl">
@@ -133,10 +133,10 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 py-8">
+      <footer className="border-t border-amber-100/50 py-8">
         <div className="container mx-auto px-6">
           <p className="text-center text-gray-500 text-sm">
-            © 2025 북클럽. All rights reserved.
+            © 2025 팀 페루 독서토론. All rights reserved.
           </p>
         </div>
       </footer>
@@ -163,7 +163,7 @@ function FeatureCard({
   };
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-gray-200 transition-all duration-300 group">
+    <div className="bg-[#fffdf9] rounded-2xl p-6 shadow-sm border border-amber-100/50 hover:shadow-lg hover:border-amber-200/50 transition-all duration-300 group">
       <div className={`w-14 h-14 bg-gradient-to-br ${colorMap[color]} rounded-xl flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform`}>
         <Icon className="w-7 h-7 text-white" />
       </div>

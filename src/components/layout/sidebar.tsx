@@ -51,7 +51,7 @@ export function Sidebar({ profile, isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto',
+          'fixed top-0 left-0 z-50 h-full w-64 bg-[#fffdf9] border-r border-amber-100 transform transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -79,8 +79,8 @@ export function Sidebar({ profile, isOpen, onClose }: SidebarProps) {
                     className={cn(
                       'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                       isActive
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? 'bg-amber-100/70 text-amber-800'
+                        : 'text-stone-700 hover:bg-amber-50'
                     )}
                   >
                     <item.icon className="w-5 h-5" />

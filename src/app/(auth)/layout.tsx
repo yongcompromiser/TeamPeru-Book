@@ -11,7 +11,7 @@ export default function AuthLayout({
       <div className="w-full max-w-md">
         <Link href="/" className="flex items-center justify-center gap-2 mb-8">
           <BookOpen className="w-10 h-10 text-blue-600" />
-          <span className="text-2xl font-bold text-gray-900">독서토론</span>
+          <span className="text-2xl font-bold text-gray-900">팀 페루</span>
         </Link>
         {children}
       </div>
