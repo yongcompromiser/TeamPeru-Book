@@ -1,5 +1,76 @@
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { userId, role } = await request.json();
+
+    const { error } = await adminClient
+      .from('profiles')
+      .update({ role })
+      .eq('id', userId);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Admin PATCH error:', error);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { userId } = await request.json();
+
+    await adminClient.from('profiles').delete().eq('id', userId);
+    await adminClient.auth.admin.deleteUser(userId);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Admin DELETE error:', error);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
 
 export async function GET() {
   try {

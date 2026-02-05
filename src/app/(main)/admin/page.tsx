@@ -109,32 +109,29 @@ export default function AdminPage() {
   };
 
   const handleApprove = async (userId: string) => {
-    await supabase
-      .from('profiles')
-      .update({ role: 'member' })
-      .eq('id', userId);
+    await fetch('/api/admin', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, role: 'member' }),
+    });
     await fetchData();
   };
 
   const handleReject = async (userId: string) => {
-    // Delete from profiles
-    await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', userId);
-
-    // Delete from auth.users (admin API call)
-    await supabase.auth.admin.deleteUser(userId);
-
+    await fetch('/api/admin', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
     await fetchData();
   };
 
   const handleRoleChange = async (userId: string, newRole: RoleType) => {
-    await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId);
-
+    await fetch('/api/admin', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, role: newRole }),
+    });
     await fetchData();
     setIsModalOpen(false);
   };
