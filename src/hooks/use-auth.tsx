@@ -136,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (mounted) {
             setProfile(p);
+            // 프로필을 못 가져와도 로딩은 끝내기 (무한로딩 방지)
             setIsLoading(false);
           }
         } else {

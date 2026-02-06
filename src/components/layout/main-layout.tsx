@@ -25,7 +25,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     }
   }, [isLoading, user, profile, router]);
 
-  if (isLoading || !profile) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
@@ -33,7 +33,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     );
   }
 
-  if (!user || profile.role === 'pending') {
+  if (!user) {
     return (
       <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
@@ -41,6 +41,15 @@ export function MainLayout({ children }: MainLayoutProps) {
     );
   }
 
+  if (profile?.role === 'pending') {
+    return (
+      <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+      </div>
+    );
+  }
+
+  // profile이 null이어도 user가 있으면 보여주기 (프로필 조회 실패 케이스)
   return (
     <div className="min-h-screen bg-[#faf8f5]">
       <Header onMenuClick={() => setSidebarOpen(true)} />

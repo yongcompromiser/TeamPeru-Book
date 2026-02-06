@@ -37,7 +37,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data: authData } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       });
@@ -49,26 +49,22 @@ export default function LoginPage() {
       }
 
       // 로그인 성공 - pending 상태 확인
-      try {
-        const { data: { user: loggedInUser } } = await supabase.auth.getUser();
-        if (loggedInUser) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', loggedInUser.id)
-            .single();
+      if (authData?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authData.user.id)
+          .single();
 
-          if (profile?.role === 'pending') {
-            window.location.href = '/pending';
-            return;
-          }
+        if (profile?.role === 'pending') {
+          window.location.href = '/pending';
+          return;
         }
-      } catch (e) {
-        // profile 조회 실패해도 대시보드로 이동
       }
 
       window.location.href = '/dashboard';
-    } catch {
+    } catch (e) {
+      console.error('Login error:', e);
       setError('로그인 중 오류가 발생했습니다');
       setIsLoading(false);
     }
