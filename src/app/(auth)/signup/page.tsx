@@ -43,24 +43,29 @@ export default function SignupPage() {
     setIsLoading(true);
     setError(null);
 
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        data: {
-          name: data.name,
+    try {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            name: data.name,
+          },
         },
-      },
-    });
+      });
 
-    if (signUpError) {
-      setError(signUpError.message);
+      if (signUpError) {
+        setError(signUpError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      window.location.href = '/pending';
+    } catch (e) {
+      console.error('Signup error:', e);
+      setError('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.');
       setIsLoading(false);
-      return;
     }
-
-    router.push('/pending');
-    router.refresh();
   };
 
   return (
