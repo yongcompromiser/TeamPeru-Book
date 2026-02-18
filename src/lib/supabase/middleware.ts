@@ -48,24 +48,6 @@ export async function updateSession(request: NextRequest) {
     return redirectResponse;
   }
 
-  // 로그인한 사용자: pending 역할이면 /pending 외 접근 차단
-  if (user && !isPublicPath) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role === 'pending') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/pending';
-      const redirectResponse = NextResponse.redirect(url);
-      supabaseResponse.cookies.getAll().forEach((cookie) => {
-        redirectResponse.cookies.set(cookie.name, cookie.value);
-      });
-      return redirectResponse;
-    }
-  }
-
+  // pending 역할 체크는 로그인 페이지와 main-layout에서 처리
   return supabaseResponse;
 }
