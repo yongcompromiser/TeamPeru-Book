@@ -459,15 +459,20 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
     setIsSubmittingComment(true);
 
-    await supabase.from('submission_comments').insert({
-      submission_id: submissionId,
-      user_id: user.id,
-      content,
-    });
+    try {
+      await fetch(`/api/meetings/${schedule?.id}/submission-comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submissionId, content }),
+      });
 
-    setCommentInputs(prev => ({ ...prev, [submissionId]: '' }));
-    await fetchMeetingData();
-    setIsSubmittingComment(false);
+      setCommentInputs(prev => ({ ...prev, [submissionId]: '' }));
+      await fetchMeetingData();
+    } catch (e) {
+      console.error('Comment error:', e);
+    } finally {
+      setIsSubmittingComment(false);
+    }
   };
 
   const renderStars = (value: number, interactive: boolean = false) => {
