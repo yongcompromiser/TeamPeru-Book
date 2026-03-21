@@ -575,10 +575,12 @@ export default function MeetingDetailPage({ params }: PageProps) {
               )}
 
               {schedule.presenter && (
-                <p className="text-sm text-gray-500 mt-2 flex items-center gap-1">
-                  <User className="w-4 h-4" />
-                  발제자: {schedule.presenter.name}
-                </p>
+                <div className="mt-3 flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg">
+                  <User className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">
+                    발제자: {schedule.presenter.name}
+                  </span>
+                </div>
               )}
 
               <div className="mt-4 flex items-center gap-3">
