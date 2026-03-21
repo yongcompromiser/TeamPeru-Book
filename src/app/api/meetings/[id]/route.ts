@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 export async function GET(
@@ -8,6 +9,7 @@ export async function GET(
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const adminClient = createAdminClient();
 
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -44,14 +46,27 @@ export async function GET(
       selected_book = b;
     }
 
-    // 제출물
-    const { data: submissions } = await supabase
+    // 제출물 (adminClient로 전체 조회 - RLS 우회)
+    const { data: submissions } = await adminClient
       .from('meeting_submissions')
-      .select('*, profile:profiles(name, avatar_url)')
+      .select('*')
       .eq('schedule_id', id);
 
+    // 제출자 프로필 별도 조회
+    if (submissions && submissions.length > 0) {
+      const userIds = submissions.map((s: any) => s.user_id);
+      const { data: profiles } = await adminClient
+        .from('profiles')
+        .select('id, name, avatar_url')
+        .in('id', userIds);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      for (const s of submissions as any[]) {
+        s.profile = profileMap.get(s.user_id) || null;
+      }
+    }
+
     // 전체 멤버 (제출 현황용)
-    const { data: allMembers } = await supabase
+    const { data: allMembers } = await adminClient
       .from('profiles')
       .select('id, name')
       .in('role', ['admin', 'member']);
@@ -60,11 +75,24 @@ export async function GET(
     let comments: any[] = [];
     if (submissions && submissions.length > 0) {
       const submissionIds = submissions.map((s: any) => s.id);
-      const { data: commentsData } = await supabase
+      const { data: commentsData } = await adminClient
         .from('submission_comments')
-        .select('*, profile:profiles(name)')
+        .select('*')
         .in('submission_id', submissionIds)
         .order('created_at', { ascending: true });
+
+      // 댓글 작성자 프로필 조회
+      if (commentsData && commentsData.length > 0) {
+        const commentUserIds = [...new Set(commentsData.map((c: any) => c.user_id))];
+        const { data: commentProfiles } = await adminClient
+          .from('profiles')
+          .select('id, name')
+          .in('id', commentUserIds as string[]);
+        const cpMap = new Map((commentProfiles || []).map((p: any) => [p.id, p]));
+        for (const c of commentsData as any[]) {
+          c.profile = cpMap.get(c.user_id) || null;
+        }
+      }
       comments = commentsData || [];
     }
 
