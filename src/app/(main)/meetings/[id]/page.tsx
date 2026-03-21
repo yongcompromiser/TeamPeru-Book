@@ -460,16 +460,27 @@ export default function MeetingDetailPage({ params }: PageProps) {
     setIsSubmittingComment(true);
 
     try {
-      await fetch(`/api/meetings/${schedule?.id}/submission-comments`, {
+      const res = await fetch(`/api/meetings/${id}/submission-comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ submissionId, content }),
       });
 
-      setCommentInputs(prev => ({ ...prev, [submissionId]: '' }));
-      await fetchMeetingData();
+      if (!res.ok) {
+        const data = await res.json();
+        console.error('Comment error:', data.error);
+        alert('댓글 작성에 실패했습니다');
+      } else {
+        setCommentInputs(prev => ({ ...prev, [submissionId]: '' }));
+        try {
+          await fetchMeetingData();
+        } catch (e) {
+          console.error('Refresh error:', e);
+        }
+      }
     } catch (e) {
       console.error('Comment error:', e);
+      alert('댓글 작성에 실패했습니다');
     } finally {
       setIsSubmittingComment(false);
     }
