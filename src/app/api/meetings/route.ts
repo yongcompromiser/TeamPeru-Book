@@ -4,22 +4,24 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const supabase = await createClient();
-    const now = new Date().toISOString();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayISO = today.toISOString();
 
-    // 다가올 모임
+    // 다가올 모임 (당일 포함)
     const { data: upcoming } = await supabase
       .from('schedules')
       .select('*')
       .eq('status', 'confirmed')
-      .gte('meeting_date', now)
+      .gte('meeting_date', todayISO)
       .order('meeting_date', { ascending: true });
 
-    // 지난 모임
+    // 지난 모임 (당일 제외)
     const { data: past } = await supabase
       .from('schedules')
       .select('*')
       .eq('status', 'confirmed')
-      .lt('meeting_date', now)
+      .lt('meeting_date', todayISO)
       .order('meeting_date', { ascending: false })
       .limit(20);
 

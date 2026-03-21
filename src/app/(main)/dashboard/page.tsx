@@ -10,11 +10,13 @@ export const dynamic = 'force-dynamic';
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  // Fetch next upcoming schedule
+  // Fetch next upcoming schedule (당일 자정까지 표시)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const { data: schedulesData } = await supabase
     .from('schedules')
     .select('*')
-    .gte('meeting_date', new Date().toISOString())
+    .gte('meeting_date', today.toISOString())
     .order('meeting_date', { ascending: true })
     .limit(1);
 

@@ -60,20 +60,22 @@ export default function MeetingsPage() {
     }
 
     // API 실패시 직접 호출
-    const now = new Date().toISOString();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayISO = today.toISOString();
 
     const { data: upcoming } = await supabase
       .from('schedules')
       .select('*')
       .eq('status', 'confirmed')
-      .gte('meeting_date', now)
+      .gte('meeting_date', todayISO)
       .order('meeting_date', { ascending: true });
 
     const { data: past } = await supabase
       .from('schedules')
       .select('*')
       .eq('status', 'confirmed')
-      .lt('meeting_date', now)
+      .lt('meeting_date', todayISO)
       .order('meeting_date', { ascending: false })
       .limit(20);
 
