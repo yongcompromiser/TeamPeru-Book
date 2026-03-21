@@ -617,6 +617,23 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
+      {/* 발제자의 책 선정 사유 */}
+      {schedule.description && schedule.presenter && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Book className="w-5 h-5 text-blue-600" />
+              {schedule.presenter.name}의 선정 사유
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+              {schedule.description}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 제출 현황 (공개 전에도 표시) */}
       {!schedule.is_revealed && (
         <Card>
