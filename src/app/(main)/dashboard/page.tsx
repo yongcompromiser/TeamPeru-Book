@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const adminClient = createAdminClient();
 
   // Fetch next upcoming schedule (당일 자정까지 표시)
   const today = new Date();
@@ -47,14 +49,27 @@ export default async function DashboardPage() {
       book = b;
     }
 
-    // Fetch submissions for this schedule
-    const { data: submissions } = await supabase
+    // Fetch submissions for this schedule (adminClient로 전체 조회)
+    const { data: submissions } = await adminClient
       .from('meeting_submissions')
-      .select('user_id, discussion, rating, one_liner, profiles(name)')
+      .select('user_id, discussion, rating, one_liner')
       .eq('schedule_id', schedule.id);
 
+    // 제출자 프로필 별도 조회
+    if (submissions && submissions.length > 0) {
+      const userIds = submissions.map((s: any) => s.user_id);
+      const { data: profiles } = await adminClient
+        .from('profiles')
+        .select('id, name')
+        .in('id', userIds);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.name]));
+      for (const s of submissions as any[]) {
+        s.profileName = profileMap.get(s.user_id) || '알 수 없음';
+      }
+    }
+
     // Fetch all members (role = member or admin)
-    const { data: members } = await supabase
+    const { data: members } = await adminClient
       .from('profiles')
       .select('id, name')
       .in('role', ['member', 'admin']);
