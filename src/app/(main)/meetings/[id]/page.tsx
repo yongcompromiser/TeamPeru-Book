@@ -32,6 +32,7 @@ interface Schedule {
   id: string;
   title: string;
   meeting_date: string;
+  description?: string | null;
   presenter_id: string | null;
   selected_book_id: string | null;
   status: string;
