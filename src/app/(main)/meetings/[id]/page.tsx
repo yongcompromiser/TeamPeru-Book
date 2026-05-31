@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useRef, use } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -25,6 +25,7 @@ import {
   Plus,
   Trash2,
   MessagesSquare,
+  ImagePlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -110,6 +111,8 @@ export default function MeetingDetailPage({ params }: PageProps) {
   // 모임 댓글 상태
   const [meetingCommentInput, setMeetingCommentInput] = useState('');
   const [isSubmittingMeetingComment, setIsSubmittingMeetingComment] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = profile?.role === 'admin';
   const isPresenter = schedule?.presenter_id === user?.id;
@@ -332,6 +335,51 @@ export default function MeetingDetailPage({ params }: PageProps) {
     }
 
     setIsSubmittingMeetingComment(false);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !user) return;
+
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      for (const file of Array.from(files)) {
+        formData.append('files', file);
+      }
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const data = await uploadRes.json();
+        alert(data.error || '업로드에 실패했습니다');
+        setIsUploadingImage(false);
+        return;
+      }
+
+      const { urls } = await uploadRes.json();
+
+      // 각 이미지 URL을 모임 기록 댓글로 전송
+      for (const url of urls) {
+        await fetch(`/api/meetings/${id}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `[image]${url}[/image]` }),
+        });
+      }
+
+      await fetchMeetingComments();
+    } catch (err) {
+      console.error('Image upload error:', err);
+      alert('이미지 업로드에 실패했습니다');
+    }
+
+    setIsUploadingImage(false);
+    if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
   const handleSaveSubmission = async () => {
@@ -948,9 +996,18 @@ export default function MeetingDetailPage({ params }: PageProps) {
                           {format(new Date(comment.created_at), 'M/d HH:mm')}
                         </span>
                       </div>
-                      <p className="text-gray-700 text-sm whitespace-pre-wrap break-words">
-                        {comment.content}
-                      </p>
+                      {comment.content.startsWith('[image]') && comment.content.endsWith('[/image]') ? (
+                        <img
+                          src={comment.content.replace('[image]', '').replace('[/image]', '')}
+                          alt="모임 사진"
+                          className="max-w-xs rounded-lg mt-1 cursor-pointer hover:opacity-90"
+                          onClick={() => window.open(comment.content.replace('[image]', '').replace('[/image]', ''), '_blank')}
+                        />
+                      ) : (
+                        <p className="text-gray-700 text-sm whitespace-pre-wrap break-words">
+                          {comment.content}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))
@@ -966,6 +1023,26 @@ export default function MeetingDetailPage({ params }: PageProps) {
             {/* 입력 영역 */}
             {user && (
               <div className="flex gap-2 border-t pt-4">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  className="flex-shrink-0 p-2 border rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-colors disabled:opacity-50"
+                >
+                  {isUploadingImage ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <ImagePlus className="w-5 h-5" />
+                  )}
+                </button>
                 <input
                   type="text"
                   value={meetingCommentInput}
