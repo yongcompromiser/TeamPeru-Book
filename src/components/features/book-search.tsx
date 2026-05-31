@@ -3,22 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 
-interface GoogleBook {
-  id: string;
-  volumeInfo: {
-    title: string;
-    authors?: string[];
-    description?: string;
-    imageLinks?: {
-      thumbnail?: string;
-    };
-    industryIdentifiers?: {
-      type: string;
-      identifier: string;
-    }[];
-  };
+interface NaverBook {
+  title: string;
+  author: string;
+  description: string;
+  image: string;
+  isbn: string;
 }
 
 interface BookSearchResult {
@@ -35,7 +26,7 @@ interface BookSearchProps {
 
 export function BookSearch({ onSelect }: BookSearchProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<GoogleBook[]>([]);
+  const [results, setResults] = useState<NaverBook[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -59,10 +50,8 @@ export function BookSearch({ onSelect }: BookSearchProps) {
 
       setIsLoading(true);
       try {
-        const response = await fetch(
-          `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5&langRestrict=ko`
-        );
-        const data = await response.json();
+        const res = await fetch(`/api/books/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
         setResults(data.items || []);
         setShowResults(true);
       } catch (error) {
@@ -76,20 +65,18 @@ export function BookSearch({ onSelect }: BookSearchProps) {
     return () => clearTimeout(debounce);
   }, [query]);
 
-  const handleSelect = (book: GoogleBook) => {
-    const isbn = book.volumeInfo.industryIdentifiers?.find(
-      (id) => id.type === 'ISBN_13' || id.type === 'ISBN_10'
-    )?.identifier;
+  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '');
 
+  const handleSelect = (book: NaverBook) => {
     onSelect({
-      title: book.volumeInfo.title,
-      author: book.volumeInfo.authors?.join(', ') || '',
-      description: book.volumeInfo.description,
-      coverUrl: book.volumeInfo.imageLinks?.thumbnail?.replace('http:', 'https:'),
-      isbn,
+      title: stripHtml(book.title),
+      author: stripHtml(book.author),
+      description: stripHtml(book.description),
+      coverUrl: book.image || undefined,
+      isbn: book.isbn?.split(' ')[1] || book.isbn || undefined,
     });
 
-    setQuery(book.volumeInfo.title);
+    setQuery(stripHtml(book.title));
     setShowResults(false);
   };
 
@@ -114,17 +101,17 @@ export function BookSearch({ onSelect }: BookSearchProps) {
 
       {showResults && results.length > 0 && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
-          {results.map((book) => (
+          {results.map((book, idx) => (
             <button
-              key={book.id}
+              key={idx}
               type="button"
               onClick={() => handleSelect(book)}
               className="w-full flex items-start gap-3 p-3 hover:bg-gray-50 text-left border-b last:border-0"
             >
-              {book.volumeInfo.imageLinks?.thumbnail ? (
+              {book.image ? (
                 <img
-                  src={book.volumeInfo.imageLinks.thumbnail.replace('http:', 'https:')}
-                  alt={book.volumeInfo.title}
+                  src={book.image}
+                  alt={stripHtml(book.title)}
                   className="w-12 h-16 object-cover rounded"
                 />
               ) : (
@@ -134,10 +121,10 @@ export function BookSearch({ onSelect }: BookSearchProps) {
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900 truncate">
-                  {book.volumeInfo.title}
+                  {stripHtml(book.title)}
                 </p>
                 <p className="text-sm text-gray-600 truncate">
-                  {book.volumeInfo.authors?.join(', ') || '저자 미상'}
+                  {stripHtml(book.author) || '저자 미상'}
                 </p>
               </div>
             </button>
