@@ -1053,7 +1053,27 @@ export default function MeetingDetailPage({ params }: PageProps) {
                       handleAddMeetingComment();
                     }
                   }}
-                  placeholder="메시지를 입력하세요..."
+                  onPaste={(e) => {
+                    const items = e.clipboardData?.items;
+                    if (!items) return;
+                    const imageFiles: File[] = [];
+                    for (const item of Array.from(items)) {
+                      if (item.type.startsWith('image/')) {
+                        const file = item.getAsFile();
+                        if (file) imageFiles.push(file);
+                      }
+                    }
+                    if (imageFiles.length > 0) {
+                      e.preventDefault();
+                      const dt = new DataTransfer();
+                      imageFiles.forEach(f => dt.items.add(f));
+                      if (imageInputRef.current) {
+                        imageInputRef.current.files = dt.files;
+                        imageInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+                      }
+                    }
+                  }}
+                  placeholder="메시지를 입력하세요... (이미지 붙여넣기 가능)"
                   className="flex-1 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
                 <Button
