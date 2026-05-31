@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -6,6 +7,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -22,7 +24,6 @@ export async function POST(request: Request) {
     const uploadedUrls: string[] = [];
 
     for (const file of files) {
-      // Check file size
       if (file.size > MAX_FILE_SIZE) {
         return NextResponse.json(
           { error: `파일 크기는 10MB를 초과할 수 없습니다: ${file.name}` },
@@ -30,7 +31,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // Check file type
       if (!file.type.startsWith('image/')) {
         return NextResponse.json(
           { error: `이미지 파일만 업로드할 수 있습니다: ${file.name}` },
@@ -38,12 +38,10 @@ export async function POST(request: Request) {
         );
       }
 
-      // Generate unique filename
-      const ext = file.name.split('.').pop();
+      const ext = file.name.split('.').pop() || 'png';
       const filename = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
+      const { data, error } = await adminClient.storage
         .from('gallery')
         .upload(filename, file, {
           contentType: file.type,
@@ -58,8 +56,7 @@ export async function POST(request: Request) {
         );
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = adminClient.storage
         .from('gallery')
         .getPublicUrl(data.path);
 
