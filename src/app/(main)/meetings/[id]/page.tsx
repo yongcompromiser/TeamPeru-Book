@@ -112,6 +112,8 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [meetingCommentInput, setMeetingCommentInput] = useState('');
   const [isSubmittingMeetingComment, setIsSubmittingMeetingComment] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentContent, setEditingCommentContent] = useState('');
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = profile?.role === 'admin';
@@ -335,6 +337,44 @@ export default function MeetingDetailPage({ params }: PageProps) {
     }
 
     setIsSubmittingMeetingComment(false);
+  };
+
+  const handleEditMeetingComment = async () => {
+    if (!editingCommentId || !editingCommentContent.trim()) return;
+
+    try {
+      const res = await fetch(`/api/meetings/${id}/comments`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId: editingCommentId, content: editingCommentContent.trim() }),
+      });
+      if (res.ok) {
+        setMeetingComments(prev => prev.map(c =>
+          c.id === editingCommentId ? { ...c, content: editingCommentContent.trim() } : c
+        ));
+        setEditingCommentId(null);
+        setEditingCommentContent('');
+      }
+    } catch (e) {
+      console.error('Edit comment error:', e);
+    }
+  };
+
+  const handleDeleteMeetingComment = async (commentId: string) => {
+    if (!confirm('삭제하시겠습니까?')) return;
+
+    try {
+      const res = await fetch(`/api/meetings/${id}/comments`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId }),
+      });
+      if (res.ok) {
+        setMeetingComments(prev => prev.filter(c => c.id !== commentId));
+      }
+    } catch (e) {
+      console.error('Delete comment error:', e);
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -995,8 +1035,38 @@ export default function MeetingDetailPage({ params }: PageProps) {
                         <span className="text-xs text-gray-400">
                           {format(new Date(comment.created_at), 'M/d HH:mm')}
                         </span>
+                        {comment.user_id === user?.id && editingCommentId !== comment.id && (
+                          <span className="flex gap-1 ml-auto">
+                            {!comment.content.startsWith('[image]') && (
+                              <button
+                                onClick={() => { setEditingCommentId(comment.id); setEditingCommentContent(comment.content); }}
+                                className="text-xs text-gray-400 hover:text-blue-500"
+                              >
+                                수정
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteMeetingComment(comment.id)}
+                              className="text-xs text-gray-400 hover:text-red-500"
+                            >
+                              삭제
+                            </button>
+                          </span>
+                        )}
                       </div>
-                      {comment.content.startsWith('[image]') && comment.content.endsWith('[/image]') ? (
+                      {editingCommentId === comment.id ? (
+                        <div className="flex gap-2 mt-1">
+                          <input
+                            type="text"
+                            value={editingCommentContent}
+                            onChange={(e) => setEditingCommentContent(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleEditMeetingComment(); }}
+                            className="flex-1 border rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500"
+                          />
+                          <button onClick={handleEditMeetingComment} className="text-xs text-blue-600 hover:text-blue-800 font-medium">저장</button>
+                          <button onClick={() => setEditingCommentId(null)} className="text-xs text-gray-400 hover:text-gray-600">취소</button>
+                        </div>
+                      ) : comment.content.startsWith('[image]') && comment.content.endsWith('[/image]') ? (
                         <img
                           src={comment.content.replace('[image]', '').replace('[/image]', '')}
                           alt="모임 사진"

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: Request,
@@ -93,6 +93,88 @@ export async function POST(
     });
   } catch (error) {
     console.error('Meeting comments POST error:', error);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { commentId, content } = await request.json();
+
+    // 본인 댓글인지 확인
+    const { data: comment } = await adminClient
+      .from('meeting_comments')
+      .select('user_id')
+      .eq('id', commentId)
+      .single();
+
+    if (!comment || comment.user_id !== user.id) {
+      return NextResponse.json({ error: '본인 댓글만 수정할 수 있습니다' }, { status: 403 });
+    }
+
+    const { error } = await adminClient
+      .from('meeting_comments')
+      .update({ content })
+      .eq('id', commentId);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Meeting comments PATCH error:', error);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { commentId } = await request.json();
+
+    // 본인 댓글인지 확인
+    const { data: comment } = await adminClient
+      .from('meeting_comments')
+      .select('user_id')
+      .eq('id', commentId)
+      .single();
+
+    if (!comment || comment.user_id !== user.id) {
+      return NextResponse.json({ error: '본인 댓글만 삭제할 수 있습니다' }, { status: 403 });
+    }
+
+    const { error } = await adminClient
+      .from('meeting_comments')
+      .delete()
+      .eq('id', commentId);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Meeting comments DELETE error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
