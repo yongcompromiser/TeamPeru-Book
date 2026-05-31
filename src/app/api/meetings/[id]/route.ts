@@ -40,7 +40,7 @@ export async function GET(
     if (schedule.selected_book_id) {
       const { data: b } = await supabase
         .from('books')
-        .select('id, title, author, cover_url')
+        .select('id, title, author, cover_url, selection_reason')
         .eq('id', schedule.selected_book_id)
         .single();
       selected_book = b;

@@ -38,7 +38,7 @@ interface Schedule {
   status: string;
   is_revealed: boolean;
   presenter?: { id: string; name: string };
-  selected_book?: { id: string; title: string; author: string; cover_url?: string };
+  selected_book?: { id: string; title: string; author: string; cover_url?: string; selection_reason?: string };
 }
 
 interface Submission {
@@ -634,18 +634,18 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
-      {/* 발제자의 책 선정 사유 */}
-      {schedule.description && schedule.presenter && (
+      {/* 책 선정 사유 */}
+      {(schedule.selected_book?.selection_reason || schedule.description) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Book className="w-5 h-5 text-blue-600" />
-              {schedule.presenter.name}의 선정 사유
+              {schedule.presenter ? `${schedule.presenter.name}의 선정 사유` : '선정 사유'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {schedule.description}
+              {schedule.selected_book?.selection_reason || schedule.description}
             </p>
           </CardContent>
         </Card>
