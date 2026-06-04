@@ -27,6 +27,7 @@ import {
   MessagesSquare,
   ImagePlus,
   Pencil,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -1308,15 +1309,35 @@ export default function MeetingDetailPage({ params }: PageProps) {
                   <FileText className="w-5 h-5" />
                   회의록 정리
                 </CardTitle>
-                {(isAdmin || isPresenter) && (
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setIsEditingMinutes(!isEditingMinutes)}
+                    onClick={() => {
+                      const blob = new Blob(
+                        ['<html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:20px;max-width:800px;margin:0 auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5}h1,h2,h3{color:#1a1a1a}</style></head><body>' + minutesSummary + '</body></html>'],
+                        { type: 'application/msword' }
+                      );
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `회의록_${schedule.title}_${format(meetingDate, 'yyyy-MM-dd')}.doc`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
                     className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
                   >
-                    <Pencil className="w-4 h-4" />
-                    {isEditingMinutes ? '닫기' : '편집'}
+                    <Download className="w-4 h-4" />
+                    다운로드
                   </button>
-                )}
+                  {(isAdmin || isPresenter) && (
+                    <button
+                      onClick={() => setIsEditingMinutes(!isEditingMinutes)}
+                      className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      {isEditingMinutes ? '닫기' : '편집'}
+                    </button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
