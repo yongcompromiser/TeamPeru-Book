@@ -128,6 +128,8 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [minutesSummary, setMinutesSummary] = useState('');
   const [isSavingMinutes, setIsSavingMinutes] = useState(false);
   const [minutesLoaded, setMinutesLoaded] = useState(false);
+  const [isEditingMinutes, setIsEditingMinutes] = useState(false);
+  const [showRawText, setShowRawText] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
   const isPresenter = schedule?.presenter_id === user?.id;
@@ -1297,63 +1299,83 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
       {/* 회의록 탭 */}
       {activeTab === 'minutes' && <>
+        {/* 정리본 (HTML 렌더링) */}
+        {minutesSummary ? (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  회의록 정리
+                </CardTitle>
+                {(isAdmin || isPresenter) && (
+                  <button
+                    onClick={() => setIsEditingMinutes(!isEditingMinutes)}
+                    className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    {isEditingMinutes ? '닫기' : '편집'}
+                  </button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isEditingMinutes ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={minutesSummary}
+                    onChange={(e) => setMinutesSummary(e.target.value)}
+                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-60 text-sm font-mono"
+                  />
+                  <Button onClick={handleSaveMinutes} disabled={isSavingMinutes} size="sm">
+                    {isSavingMinutes ? <><Loader2 className="w-4 h-4 animate-spin mr-1" /> 저장 중</> : <><Check className="w-4 h-4 mr-1" /> 저장</>}
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-table:text-sm"
+                  dangerouslySetInnerHTML={{ __html: minutesSummary }}
+                />
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">아직 정리된 회의록이 없습니다</p>
+              <p className="text-sm text-gray-400 mt-1">STT 원문을 등록하면 클로드가 정리해드립니다</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* STT 원문 (접기/펼치기) */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              회의록
-            </CardTitle>
+            <button
+              onClick={() => setShowRawText(!showRawText)}
+              className="w-full flex items-center justify-between"
+            >
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                STT 원문
+              </CardTitle>
+              <span className="text-sm text-gray-500">{showRawText ? '접기 ▲' : '펼치기 ▼'}</span>
+            </button>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* STT 원문 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                STT 원문 (녹취록 붙여넣기)
-              </label>
+          {showRawText && (
+            <CardContent className="space-y-3">
               <textarea
                 value={minutesRaw}
                 onChange={(e) => setMinutesRaw(e.target.value)}
                 placeholder="녹취록 텍스트를 여기에 붙여넣으세요..."
                 className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-40 text-sm"
               />
-            </div>
-
-            {/* AI 정리본 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                정리본
-              </label>
-              <textarea
-                value={minutesSummary}
-                onChange={(e) => setMinutesSummary(e.target.value)}
-                placeholder="AI가 정리한 회의록 또는 직접 작성..."
-                className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-60 text-sm"
-              />
-            </div>
-
-            {/* 저장 버튼 */}
-            <div className="flex gap-2">
-              <Button onClick={handleSaveMinutes} disabled={isSavingMinutes}>
-                {isSavingMinutes ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" /> 저장 중...</>
-                ) : (
-                  <><Check className="w-4 h-4 mr-2" /> 저장</>
-                )}
+              <Button onClick={handleSaveMinutes} disabled={isSavingMinutes} size="sm">
+                {isSavingMinutes ? <><Loader2 className="w-4 h-4 animate-spin mr-1" /> 저장 중</> : <><Check className="w-4 h-4 mr-1" /> 저장</>}
               </Button>
-            </div>
-
-            {/* 정리본 미리보기 */}
-            {minutesSummary && (
-              <div className="border-t pt-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">미리보기</h3>
-                <div className="prose prose-sm max-w-none bg-gray-50 rounded-lg p-4">
-                  <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">
-                    {minutesSummary}
-                  </pre>
-                </div>
-              </div>
-            )}
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
       </>}
     </div>
