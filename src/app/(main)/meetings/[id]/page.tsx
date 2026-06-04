@@ -120,6 +120,15 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [isSavingReason, setIsSavingReason] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState<'info' | 'discussion' | 'record' | 'minutes'>('info');
+
+  // 회의록 상태
+  const [minutesRaw, setMinutesRaw] = useState('');
+  const [minutesSummary, setMinutesSummary] = useState('');
+  const [isSavingMinutes, setIsSavingMinutes] = useState(false);
+  const [minutesLoaded, setMinutesLoaded] = useState(false);
+
   const isAdmin = profile?.role === 'admin';
   const isPresenter = schedule?.presenter_id === user?.id;
   const canReveal = isAdmin || isPresenter;
@@ -128,6 +137,37 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const isOnOrAfterMeetingDay = meetingDay
     ? meetingDay.toDateString() <= today.toDateString()
     : false;
+
+  const fetchMinutes = async () => {
+    if (minutesLoaded) return;
+    try {
+      const res = await fetch(`/api/meetings/${id}/minutes`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.minutes) {
+          setMinutesRaw(data.minutes.raw_text || '');
+          setMinutesSummary(data.minutes.summary || '');
+        }
+      }
+    } catch {}
+    setMinutesLoaded(true);
+  };
+
+  const handleSaveMinutes = async () => {
+    setIsSavingMinutes(true);
+    try {
+      await fetch(`/api/meetings/${id}/minutes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_text: minutesRaw, summary: minutesSummary }),
+      });
+    } catch {}
+    setIsSavingMinutes(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'minutes') fetchMinutes();
+  }, [activeTab]);
 
   useEffect(() => {
     if (id) {
@@ -726,6 +766,31 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
+      {/* 탭 바 */}
+      <div className="flex border-b border-gray-200">
+        {[
+          { key: 'info' as const, label: '모임정보' },
+          { key: 'discussion' as const, label: '발제' },
+          { key: 'record' as const, label: '모임기록' },
+          { key: 'minutes' as const, label: '회의록' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+              activeTab === tab.key
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 모임정보 탭 */}
+      {activeTab === 'info' && <>
       {/* 발제자의 선정 사유 (schedule.description) */}
       {(schedule.description || canReveal) && (
         <Card>
@@ -841,6 +906,10 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </Card>
       )}
 
+      </>}
+
+      {/* 발제 탭 */}
+      {activeTab === 'discussion' && <>
       {/* 내 발제 작성 (공개 전에만 수정 가능) */}
       {!schedule.is_revealed && user && (
         <Card>
@@ -1053,8 +1122,12 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </Card>
       )}
 
-      {/* 모임 기록 채팅 (공개된 경우만) */}
-      {schedule.is_revealed && (
+      </>}
+
+      {/* 모임기록 탭 */}
+      {activeTab === 'record' && <>
+      {/* 모임 기록 채팅 */}
+      {schedule.is_revealed ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -1212,7 +1285,77 @@ export default function MeetingDetailPage({ params }: PageProps) {
             )}
           </CardContent>
         </Card>
+      ) : (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <MessagesSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">모임이 공개된 후 이용할 수 있습니다</p>
+          </CardContent>
+        </Card>
       )}
+      </>}
+
+      {/* 회의록 탭 */}
+      {activeTab === 'minutes' && <>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              회의록
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* STT 원문 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                STT 원문 (녹취록 붙여넣기)
+              </label>
+              <textarea
+                value={minutesRaw}
+                onChange={(e) => setMinutesRaw(e.target.value)}
+                placeholder="녹취록 텍스트를 여기에 붙여넣으세요..."
+                className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-40 text-sm"
+              />
+            </div>
+
+            {/* AI 정리본 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                정리본
+              </label>
+              <textarea
+                value={minutesSummary}
+                onChange={(e) => setMinutesSummary(e.target.value)}
+                placeholder="AI가 정리한 회의록 또는 직접 작성..."
+                className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-60 text-sm"
+              />
+            </div>
+
+            {/* 저장 버튼 */}
+            <div className="flex gap-2">
+              <Button onClick={handleSaveMinutes} disabled={isSavingMinutes}>
+                {isSavingMinutes ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" /> 저장 중...</>
+                ) : (
+                  <><Check className="w-4 h-4 mr-2" /> 저장</>
+                )}
+              </Button>
+            </div>
+
+            {/* 정리본 미리보기 */}
+            {minutesSummary && (
+              <div className="border-t pt-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">미리보기</h3>
+                <div className="prose prose-sm max-w-none bg-gray-50 rounded-lg p-4">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">
+                    {minutesSummary}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </>}
     </div>
   );
 }
