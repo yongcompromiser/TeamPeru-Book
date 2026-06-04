@@ -142,6 +142,94 @@ async function getSubmissions(scheduleId) {
   }
 }
 
+async function getAllData(scheduleId) {
+  // 모임 정보
+  const { data: schedule } = await supabase
+    .from('schedules')
+    .select('title, meeting_date, presenter_id, selected_book_id')
+    .eq('id', scheduleId)
+    .single();
+
+  if (!schedule) { console.log('모임을 찾을 수 없습니다.'); return; }
+
+  // 책 정보
+  let book = null;
+  if (schedule.selected_book_id) {
+    const { data } = await supabase.from('books').select('title, author, selection_reason').eq('id', schedule.selected_book_id).single();
+    book = data;
+  }
+
+  // 발제자
+  let presenter = null;
+  if (schedule.presenter_id) {
+    const { data } = await supabase.from('profiles').select('name').eq('id', schedule.presenter_id).single();
+    presenter = data;
+  }
+
+  // 제출물
+  const { data: submissions } = await supabase.from('meeting_submissions').select('user_id, discussion, one_liner, rating').eq('schedule_id', scheduleId);
+  const userIds = (submissions || []).map(s => s.user_id);
+  let nameMap = new Map();
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase.from('profiles').select('id, name').in('id', userIds);
+    nameMap = new Map(profiles?.map(p => [p.id, p.name]) || []);
+  }
+
+  // 모임기록 채팅
+  const { data: chatComments } = await supabase.from('meeting_comments').select('user_id, content, created_at').eq('schedule_id', scheduleId).order('created_at', { ascending: true });
+  let chatNameMap = new Map();
+  if (chatComments && chatComments.length > 0) {
+    const chatUserIds = [...new Set(chatComments.map(c => c.user_id))];
+    const { data: chatProfiles } = await supabase.from('profiles').select('id, name').in('id', chatUserIds);
+    chatNameMap = new Map(chatProfiles?.map(p => [p.id, p.name]) || []);
+  }
+
+  // 회의록 원문
+  const { data: minutes } = await supabase.from('meeting_minutes').select('raw_text, summary').eq('schedule_id', scheduleId).single();
+
+  // 출력
+  const date = new Date(schedule.meeting_date).toLocaleDateString('ko-KR');
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`📖 ${schedule.title} (${date})`);
+  console.log(`${'='.repeat(60)}`);
+  console.log(`\n📚 책: ${book?.title || '미선정'} — ${book?.author || ''}`);
+  console.log(`👤 발제자: ${presenter?.name || '미정'}`);
+  if (book?.selection_reason) console.log(`💡 등록 코멘트: ${book.selection_reason.substring(0, 100)}...`);
+
+  console.log(`\n--- 참여자 발제/평점/한줄평 ---`);
+  for (const s of (submissions || [])) {
+    console.log(`\n[${nameMap.get(s.user_id) || '?'}] 평점:${s.rating || '-'} 한줄평:${s.one_liner || '-'}`);
+    if (s.discussion) {
+      try {
+        const parsed = JSON.parse(s.discussion);
+        if (Array.isArray(parsed)) parsed.forEach((d, i) => console.log(`  발제${i + 1}: ${d}`));
+        else console.log(`  발제: ${s.discussion}`);
+      } catch { console.log(`  발제: ${s.discussion}`); }
+    }
+  }
+
+  if (chatComments && chatComments.length > 0) {
+    const textComments = chatComments.filter(c => !c.content.startsWith('[image]'));
+    if (textComments.length > 0) {
+      console.log(`\n--- 모임기록 채팅 (${textComments.length}건) ---`);
+      for (const c of textComments) {
+        console.log(`${chatNameMap.get(c.user_id) || '?'}: ${c.content}`);
+      }
+    }
+  }
+
+  if (minutes?.raw_text) {
+    console.log(`\n--- STT 원문 ---`);
+    console.log(minutes.raw_text);
+  } else {
+    console.log(`\n⚠️ STT 원문 없음`);
+  }
+
+  if (minutes?.summary) {
+    console.log(`\n--- 정리본 (있음, ${minutes.summary.length}자) ---`);
+  }
+}
+
 const [,, command, arg1, arg2] = process.argv;
 
 switch (command) {
@@ -157,10 +245,14 @@ switch (command) {
   case 'submissions':
     getSubmissions(arg1);
     break;
+  case 'all':
+    getAllData(arg1);
+    break;
   default:
     console.log('사용법:');
     console.log('  node scripts/minutes-helper.js list');
     console.log('  node scripts/minutes-helper.js get <schedule_id>');
     console.log('  node scripts/minutes-helper.js submissions <schedule_id>');
+    console.log('  node scripts/minutes-helper.js all <schedule_id>    ← 전체 데이터 조회');
     console.log('  node scripts/minutes-helper.js save <schedule_id> [file_path]');
 }

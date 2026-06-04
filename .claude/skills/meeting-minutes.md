@@ -5,10 +5,18 @@
 
 ## 회의록 정리 프로세스
 
-### 입력
-- STT(음성→텍스트) 변환된 원문 텍스트
-- 참석자 이름 목록
-- 모임 날짜, 책 정보
+### 입력 소스 (모두 자동 수집)
+아래 데이터를 `scripts/minutes-helper.js`를 통해 DB에서 자동으로 수집한다:
+1. **STT 원문** — `meeting_minutes.raw_text` (녹취록 텍스트)
+2. **참여자 발제** — `meeting_submissions.discussion` (각 참석자의 발제 질문/내용)
+3. **한줄평** — `meeting_submissions.one_liner` (각 참석자의 한줄평)
+4. **평점** — `meeting_submissions.rating` (각 참석자의 책 평점)
+5. **모임기록** — `meeting_comments` (모임 당일 채팅 기록, 사진 포함)
+6. **책 정보** — `books` (제목, 저자, 등록 코멘트)
+7. **선정 사유** — `schedules.description` (발제자의 책 선정 사유)
+8. **참석자 목록** — `profiles` (이름, 역할)
+
+STT 원문이 메인 소스이고, 나머지는 보조 참고자료로 사용하여 정확도와 풍부함을 높인다.
 
 ### 정리 규칙
 1. **화자 식별**: STT 오류로 이름이 뒤섞이는 경우 맥락에 맞춰 보정 (예: 주영/준영→준용, 성황→성한, 교철→규철)

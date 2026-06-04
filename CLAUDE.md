@@ -14,17 +14,21 @@
 node scripts/minutes-helper.js list
 ```
 
-### 2. STT 원문 + 제출물 조회
+### 2. 전체 데이터 수집
 ```bash
-node scripts/minutes-helper.js get <schedule_id>
-node scripts/minutes-helper.js submissions <schedule_id>
+node scripts/minutes-helper.js all <schedule_id>
 ```
+이 명령 하나로 아래 데이터를 모두 조회:
+- STT 원문, 책 정보, 선정 사유
+- 참여자 발제, 한줄평, 평점
+- 모임기록 채팅
 
-### 3. 분석 및 정리
+### 3. 분석 및 정리 (HTML 형식)
 `.claude/skills/meeting-minutes.md` 스킬 규칙에 따라:
 - 회의록 구조화 정리
 - 참여자별 대화량 백분율 분석
 - 모임별 시상 (고정 + AI 즉석 시상)
+- **출력은 HTML 형식**으로 생성 (웹사이트에서 렌더링)
 
 ### 4. 결과 저장
 정리본을 임시 파일로 작성 후 DB에 저장:
