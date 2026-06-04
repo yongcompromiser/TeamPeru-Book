@@ -192,13 +192,13 @@ export default function BookDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
-      {/* Selection Reason */}
+      {/* 등록 코멘트 */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <span className="text-blue-500">💡</span>
-              선정 사유
+              등록 코멘트
             </h2>
             {user && !isEditingReason && (
               <button
@@ -216,7 +216,7 @@ export default function BookDetailPage({ params }: PageProps) {
               <textarea
                 value={reasonInput}
                 onChange={(e) => setReasonInput(e.target.value)}
-                placeholder="이 책을 선정한 이유를 작성하세요..."
+                placeholder="이 책을 추천하는 이유를 작성하세요..."
                 className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-24"
               />
               <div className="flex gap-2">
@@ -235,7 +235,7 @@ export default function BookDetailPage({ params }: PageProps) {
               {book.selection_reason}
             </p>
           ) : (
-            <p className="text-gray-400 text-sm">아직 선정 사유가 작성되지 않았습니다.</p>
+            <p className="text-gray-400 text-sm">아직 등록 코멘트가 작성되지 않았습니다.</p>
           )}
         </CardContent>
       </Card>

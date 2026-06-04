@@ -229,7 +229,7 @@ export default function NewBookPage() {
               <div className="mt-4">
                 <Textarea
                   id="selection_reason"
-                  label="선정 사유 (선택)"
+                  label="등록 코멘트 (선택)"
                   placeholder="이 책을 추천하는 이유를 작성하세요"
                   rows={3}
                   error={errors.selection_reason?.message}

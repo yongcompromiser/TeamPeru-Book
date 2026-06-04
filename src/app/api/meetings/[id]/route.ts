@@ -175,6 +175,38 @@ export async function PATCH(
       return NextResponse.json({ success: true });
     }
 
+    if (action === 'update_description') {
+      const { data: profile } = await adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      const { data: schedule } = await adminClient
+        .from('schedules')
+        .select('presenter_id')
+        .eq('id', id)
+        .single();
+
+      const isAdmin = profile?.role === 'admin';
+      const isPresenter = schedule?.presenter_id === user.id;
+
+      if (!isAdmin && !isPresenter) {
+        return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 });
+      }
+
+      const { error } = await adminClient
+        .from('schedules')
+        .update({ description: body.description })
+        .eq('id', id);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
     console.error('Meeting PATCH error:', error);

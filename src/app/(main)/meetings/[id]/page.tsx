@@ -26,6 +26,7 @@ import {
   Trash2,
   MessagesSquare,
   ImagePlus,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -114,6 +115,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentContent, setEditingCommentContent] = useState('');
+  const [isEditingReason, setIsEditingReason] = useState(false);
+  const [reasonInput, setReasonInput] = useState('');
+  const [isSavingReason, setIsSavingReason] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = profile?.role === 'admin';
@@ -722,19 +726,67 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
-      {/* 책 선정 사유 */}
-      {(schedule.selected_book?.selection_reason || schedule.description) && (
+      {/* 발제자의 선정 사유 (schedule.description) */}
+      {(schedule.description || canReveal) && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Book className="w-5 h-5 text-blue-600" />
-              {schedule.presenter ? `${schedule.presenter.name}의 선정 사유` : '선정 사유'}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Book className="w-5 h-5 text-blue-600" />
+                {schedule.presenter ? `${schedule.presenter.name}의 선정 사유` : '선정 사유'}
+              </CardTitle>
+              {canReveal && !isEditingReason && (
+                <button
+                  onClick={() => { setIsEditingReason(true); setReasonInput(schedule.description || ''); }}
+                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                >
+                  <Pencil className="w-4 h-4" />
+                  {schedule.description ? '수정' : '작성'}
+                </button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {schedule.selected_book?.selection_reason || schedule.description}
-            </p>
+            {isEditingReason ? (
+              <div className="space-y-3">
+                <textarea
+                  value={reasonInput}
+                  onChange={(e) => setReasonInput(e.target.value)}
+                  placeholder="이 책을 선정한 이유를 작성하세요..."
+                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-24"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" disabled={isSavingReason} onClick={async () => {
+                    setIsSavingReason(true);
+                    try {
+                      const res = await fetch(`/api/meetings/${id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'update_description', description: reasonInput || null }),
+                      });
+                      if (res.ok) {
+                        setSchedule({ ...schedule, description: reasonInput || null });
+                        setIsEditingReason(false);
+                      }
+                    } catch {}
+                    setIsSavingReason(false);
+                  }}>
+                    {isSavingReason ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Check className="w-4 h-4 mr-1" />}
+                    저장
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsEditingReason(false)}>
+                    <X className="w-4 h-4 mr-1" />
+                    취소
+                  </Button>
+                </div>
+              </div>
+            ) : schedule.description ? (
+              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {schedule.description}
+              </p>
+            ) : (
+              <p className="text-gray-400 text-sm">아직 선정 사유가 작성되지 않았습니다.</p>
+            )}
           </CardContent>
         </Card>
       )}
