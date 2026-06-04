@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, BookOpen, Tag, User, Pencil, Check, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Tag, User, Pencil, Check, X, Loader2, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { BOOK_STATUS_LABELS } from '@/types';
 
@@ -15,12 +16,14 @@ interface PageProps {
 
 export default function BookDetailPage({ params }: PageProps) {
   const { id } = use(params);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const router = useRouter();
   const [book, setBook] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditingReason, setIsEditingReason] = useState(false);
   const [reasonInput, setReasonInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchBook();
@@ -61,6 +64,29 @@ export default function BookDetailPage({ params }: PageProps) {
       console.error('Failed to save:', e);
     }
     setIsSaving(false);
+  };
+
+  const canDelete = book && (book.created_by === user?.id || profile?.role === 'admin');
+
+  const handleDelete = async () => {
+    if (!confirm('이 책을 삭제하시겠습니까?')) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch('/api/books', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        router.push('/books');
+      } else {
+        const data = await res.json();
+        alert(data.error || '삭제에 실패했습니다');
+      }
+    } catch {
+      alert('삭제에 실패했습니다');
+    }
+    setIsDeleting(false);
   };
 
   if (isLoading) {
@@ -136,6 +162,24 @@ export default function BookDetailPage({ params }: PageProps) {
 
               {book.isbn && (
                 <p className="text-sm text-gray-500 mt-2">ISBN: {book.isbn}</p>
+              )}
+
+              {canDelete && (
+                <div className="mt-4">
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-1" />
+                    )}
+                    책 삭제
+                  </Button>
+                </div>
               )}
             </div>
           </div>

@@ -93,3 +93,53 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await request.json();
+
+    // 책 정보 조회
+    const { data: book } = await adminClient
+      .from('books')
+      .select('created_by')
+      .eq('id', id)
+      .single();
+
+    if (!book) {
+      return NextResponse.json({ error: '책을 찾을 수 없습니다' }, { status: 404 });
+    }
+
+    // 권한 확인: 등록자 또는 관리자
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (book.created_by !== user.id && profile?.role !== 'admin') {
+      return NextResponse.json({ error: '삭제 권한이 없습니다' }, { status: 403 });
+    }
+
+    const { error } = await adminClient
+      .from('books')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Books DELETE error:', error);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
