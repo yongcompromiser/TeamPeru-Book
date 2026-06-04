@@ -141,37 +141,13 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
-            <div className="relative group">
-              <Avatar src={displayAvatar} name={profile.name} size="lg" />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-              >
-                {isUploading ? (
-                  <Loader2 className="w-6 h-6 text-white animate-spin" />
-                ) : (
-                  <Camera className="w-6 h-6 text-white" />
-                )}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </div>
+            <Avatar src={displayAvatar} name={profile.name} size="lg" />
             <div>
               <CardTitle>{profile.name}</CardTitle>
               <p className="text-sm text-gray-600">{profile.email}</p>
               <Badge variant={profile.role === 'admin' ? 'info' : 'default'} className="mt-1">
                 {profile.role === 'admin' ? '관리자' : '멤버'}
               </Badge>
-              <p className="text-xs text-gray-400 mt-1">
-                이미지를 클릭하거나 클립보드에서 붙여넣기(Ctrl+V)
-              </p>
             </div>
           </div>
         </CardHeader>
@@ -188,6 +164,37 @@ export default function ProfilePage() {
                 {message.text}
               </div>
             )}
+
+            {/* 프로필 이미지 변경 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">프로필 이미지</label>
+              <div className="flex items-center gap-4">
+                <Avatar src={displayAvatar} name={profile.name} size="lg" />
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin mr-2" /> 업로드 중...</>
+                    ) : (
+                      <><Camera className="w-4 h-4 mr-2" /> 이미지 변경</>
+                    )}
+                  </Button>
+                  <p className="text-xs text-gray-400">파일 선택 또는 이 페이지에서 Ctrl+V로 붙여넣기</p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+            </div>
 
             <Input
               id="name"
