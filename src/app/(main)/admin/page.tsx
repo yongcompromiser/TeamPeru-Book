@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield, Check, X, Clock } from 'lucide-react';
+import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield, Check, X, Clock, Trash2 } from 'lucide-react';
 import { Profile } from '@/types';
 
 type RoleType = 'admin' | 'member' | 'visitor' | 'pending';
@@ -118,6 +118,16 @@ export default function AdminPage() {
   };
 
   const handleReject = async (userId: string) => {
+    await fetch('/api/admin', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    await fetchData();
+  };
+
+  const handleDeleteUser = async (userId: string, name: string) => {
+    if (!confirm(`'${name}' 회원을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
     await fetch('/api/admin', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -245,17 +255,27 @@ export default function AdminPage() {
                       {new Date(user.created_at).toLocaleDateString('ko-KR')}
                     </td>
                     <td className="py-3 px-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setIsModalOpen(true);
-                        }}
-                        disabled={user.id === profile?.id}
-                      >
-                        역할 변경
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setIsModalOpen(true);
+                          }}
+                          disabled={user.id === profile?.id}
+                        >
+                          역할 변경
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeleteUser(user.id, user.name)}
+                          disabled={user.id === profile?.id}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
