@@ -1,29 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Camera, Loader2 } from 'lucide-react';
 
 const profileSchema = z.object({
   name: z.string().min(2, '이름은 최소 2자 이상이어야 합니다'),
-  avatar_url: z.string().url('유효한 URL을 입력해주세요').optional().or(z.literal('')),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
-  const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -33,9 +34,73 @@ export default function ProfilePage() {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: profile?.name || '',
-      avatar_url: profile?.avatar_url || '',
     },
   });
+
+  const uploadImage = async (file: File) => {
+    setIsUploading(true);
+    setMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('files', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setMessage({ type: 'error', text: data.error || '업로드 실패' });
+        setIsUploading(false);
+        return;
+      }
+
+      const { urls } = await res.json();
+      const avatarUrl = urls[0];
+
+      // 프로필에 저장
+      const saveRes = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: avatarUrl }),
+      });
+
+      if (saveRes.ok) {
+        setAvatarPreview(avatarUrl);
+        setMessage({ type: 'success', text: '프로필 이미지가 변경되었습니다' });
+        await refreshProfile();
+      } else {
+        setMessage({ type: 'error', text: '프로필 저장에 실패했습니다' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: '업로드 중 오류가 발생했습니다' });
+    }
+
+    setIsUploading(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadImage(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          uploadImage(file);
+          return;
+        }
+      }
+    }
+  };
 
   const onSubmit = async (data: ProfileFormData) => {
     if (!profile) return;
@@ -43,19 +108,17 @@ export default function ProfilePage() {
     setIsLoading(true);
     setMessage(null);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        name: data.name,
-        avatar_url: data.avatar_url || null,
-      })
-      .eq('id', profile.id);
+    const res = await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: data.name }),
+    });
 
-    if (error) {
-      setMessage({ type: 'error', text: '프로필 업데이트에 실패했습니다' });
-    } else {
+    if (res.ok) {
       setMessage({ type: 'success', text: '프로필이 업데이트되었습니다' });
       await refreshProfile();
+    } else {
+      setMessage({ type: 'error', text: '프로필 업데이트에 실패했습니다' });
     }
 
     setIsLoading(false);
@@ -69,20 +132,46 @@ export default function ProfilePage() {
     );
   }
 
+  const displayAvatar = avatarPreview || profile.avatar_url;
+
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto" onPaste={handlePaste}>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">프로필</h1>
 
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
-            <Avatar src={profile.avatar_url} name={profile.name} size="lg" />
+            <div className="relative group">
+              <Avatar src={displayAvatar} name={profile.name} size="lg" />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              >
+                {isUploading ? (
+                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-6 h-6 text-white" />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
             <div>
               <CardTitle>{profile.name}</CardTitle>
               <p className="text-sm text-gray-600">{profile.email}</p>
               <Badge variant={profile.role === 'admin' ? 'info' : 'default'} className="mt-1">
                 {profile.role === 'admin' ? '관리자' : '멤버'}
               </Badge>
+              <p className="text-xs text-gray-400 mt-1">
+                이미지를 클릭하거나 클립보드에서 붙여넣기(Ctrl+V)
+              </p>
             </div>
           </div>
         </CardHeader>
@@ -106,15 +195,6 @@ export default function ProfilePage() {
               label="이름"
               error={errors.name?.message}
               {...register('name')}
-            />
-
-            <Input
-              id="avatar_url"
-              type="url"
-              label="프로필 이미지 URL"
-              placeholder="https://example.com/avatar.jpg"
-              error={errors.avatar_url?.message}
-              {...register('avatar_url')}
             />
 
             <div className="pt-4">
