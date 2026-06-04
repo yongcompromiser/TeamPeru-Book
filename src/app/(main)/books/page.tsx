@@ -16,6 +16,7 @@ interface Book {
   author: string;
   cover_url?: string;
   status: BookStatus;
+  created_at?: string;
 }
 
 const STATUS_FILTERS: { value: BookStatus | 'all'; label: string }[] = [
@@ -59,7 +60,7 @@ export default function BooksPage() {
     // API 실패시 직접 호출
     const { data } = await supabase
       .from('books')
-      .select('id, title, author, cover_url, status')
+      .select('id, title, author, cover_url, status, created_at')
       .order('created_at', { ascending: false });
 
     setBooks(data || []);
@@ -177,6 +178,11 @@ export default function BooksPage() {
 
                     <h3 className="font-semibold text-gray-900 truncate">{book.title}</h3>
                     <p className="text-sm text-gray-600 truncate">{book.author}</p>
+                    {book.created_at && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(book.created_at).toLocaleDateString('ko-KR')}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </Link>
