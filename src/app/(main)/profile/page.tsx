@@ -70,7 +70,7 @@ export default function ProfilePage() {
       if (saveRes.ok) {
         setAvatarPreview(avatarUrl);
         setMessage({ type: 'success', text: '프로필 이미지가 변경되었습니다' });
-        await refreshProfile();
+        try { await refreshProfile(); } catch {}
       } else {
         setMessage({ type: 'error', text: '프로필 저장에 실패했습니다' });
       }
@@ -108,16 +108,20 @@ export default function ProfilePage() {
     setIsLoading(true);
     setMessage(null);
 
-    const res = await fetch('/api/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: data.name }),
-    });
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: data.name }),
+      });
 
-    if (res.ok) {
-      setMessage({ type: 'success', text: '프로필이 업데이트되었습니다' });
-      await refreshProfile();
-    } else {
+      if (res.ok) {
+        setMessage({ type: 'success', text: '프로필이 업데이트되었습니다' });
+        try { await refreshProfile(); } catch {}
+      } else {
+        setMessage({ type: 'error', text: '프로필 업데이트에 실패했습니다' });
+      }
+    } catch {
       setMessage({ type: 'error', text: '프로필 업데이트에 실패했습니다' });
     }
 
