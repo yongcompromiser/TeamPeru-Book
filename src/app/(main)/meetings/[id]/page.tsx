@@ -122,7 +122,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   // 탭 상태
-  const [activeTab, setActiveTab] = useState<'info' | 'discussion' | 'record' | 'minutes'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'minutes'>('info');
 
   // 회의록 상태
   const [minutesRaw, setMinutesRaw] = useState('');
@@ -772,9 +772,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
       {/* 탭 바 */}
       <div className="flex border-b border-gray-200">
         {[
-          { key: 'info' as const, label: '모임정보' },
-          { key: 'discussion' as const, label: '발제' },
-          { key: 'record' as const, label: '모임기록' },
+          { key: 'info' as const, label: '모임' },
           { key: 'minutes' as const, label: '회의록' },
         ].map((tab) => (
           <button
@@ -909,10 +907,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </Card>
       )}
 
-      </>}
-
-      {/* 발제 탭 */}
-      {activeTab === 'discussion' && <>
       {/* 내 발제 작성 (공개 전에만 수정 가능) */}
       {!schedule.is_revealed && user && (
         <Card>
@@ -1125,10 +1119,6 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </Card>
       )}
 
-      </>}
-
-      {/* 모임기록 탭 */}
-      {activeTab === 'record' && <>
       {/* 모임 기록 채팅 */}
       {schedule.is_revealed ? (
         <Card>
@@ -1288,14 +1278,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
             )}
           </CardContent>
         </Card>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <MessagesSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">모임이 공개된 후 이용할 수 있습니다</p>
-          </CardContent>
-        </Card>
-      )}
+      ) : null}
       </>}
 
       {/* 회의록 탭 */}
