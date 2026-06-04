@@ -33,16 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const initialized = useRef(false);
+  const loadingRef = useRef(true);
 
   const supabase = createClient();
 
-  // 서버 API를 통한 유저/프로필 로드 (Supabase 직접 호출이 차단된 경우 사용)
   const fetchViaAPI = async (): Promise<{ user: User | null; profile: Profile | null }> => {
     try {
       const res = await fetch('/api/profile');
       const data = await res.json();
       if (data.profile) {
-        console.log('Loaded via API');
         return {
           user: data.user as User | null,
           profile: data.profile as Profile
@@ -50,24 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { user: null, profile: null };
     } catch {
-      console.log('API fetch failed');
       return { user: null, profile: null };
     }
   };
 
-  // 하위 호환성을 위한 래퍼
-  const fetchProfileViaAPI = async (): Promise<Profile | null> => {
-    const { profile } = await fetchViaAPI();
-    return profile;
-  };
-
-  const fetchProfile = async (userId: string, useAPI = false): Promise<Profile | null> => {
-    // API 모드
-    if (useAPI) {
-      return fetchProfileViaAPI();
-    }
-
-    // 직접 Supabase 호출
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+    // 1. 직접 Supabase 호출
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -75,17 +62,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (error) {
-        console.log('Profile fetch error:', error.message);
-        return null;
-      }
+      if (!error && data) return data as Profile;
+    } catch {}
 
-      console.log('Profile loaded directly');
-      return data as Profile | null;
-    } catch (e) {
-      console.log('Profile direct fetch failed');
-      return null;
-    }
+    // 2. 실패하면 서버 API
+    try {
+      const { profile } = await fetchViaAPI();
+      return profile;
+    } catch {}
+
+    return null;
   };
 
   const refreshProfile = async () => {
@@ -97,15 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      // API를 통해 로그아웃 시도
       await fetch('/api/auth/logout', { method: 'POST' });
-    } catch (e) {
-      // API 실패시 직접 시도
+    } catch {
       await supabase.auth.signOut();
     }
     setUser(null);
     setProfile(null);
     window.location.href = '/login';
+  };
+
+  const finishLoading = () => {
+    loadingRef.current = false;
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -114,52 +103,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let mounted = true;
 
-    // onAuthStateChange가 INITIAL_SESSION 이벤트를 보내므로 이것만 사용
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
-        console.log('Auth event:', event);
-
         if (!mounted) return;
 
         const currentUser = session?.user ?? null;
         setUser(currentUser);
 
         if (currentUser) {
-          // 1. 직접 Supabase 호출 시도
-          let p = await fetchProfile(currentUser.id, false);
-
-          // 2. 실패하면 서버 API를 통해 시도
-          if (!p && mounted) {
-            console.log('Trying via server API...');
-            p = await fetchProfile(currentUser.id, true);
-          }
-
-          if (mounted) {
-            setProfile(p);
-            // 프로필을 못 가져와도 로딩은 끝내기 (무한로딩 방지)
-            setIsLoading(false);
-          }
+          const p = await fetchProfile(currentUser.id);
+          if (mounted) setProfile(p);
         } else {
           setProfile(null);
-          if (mounted) setIsLoading(false);
         }
+
+        if (mounted) finishLoading();
       }
     );
 
-    // 3초 후에도 이벤트 안 오면 API로 시도
+    // 2초 후에도 이벤트 안 오면 API fallback 후 무조건 로딩 종료
     const timeout = setTimeout(async () => {
-      if (mounted && isLoading) {
-        console.log('Auth timeout - trying API fallback');
+      if (!mounted || !loadingRef.current) return;
+
+      try {
         const { user: apiUser, profile: apiProfile } = await fetchViaAPI();
-        if (mounted) {
+        if (mounted && loadingRef.current) {
           if (apiUser) {
             setUser(apiUser as User);
             setProfile(apiProfile);
           }
-          setIsLoading(false);
         }
-      }
-    }, 3000);
+      } catch {}
+
+      if (mounted) finishLoading();
+    }, 2000);
 
     return () => {
       mounted = false;
