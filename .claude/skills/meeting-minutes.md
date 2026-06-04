@@ -46,24 +46,35 @@ STT 원문이 메인 소스이고, 나머지는 보조 참고자료로 사용하
 4. **확장 토론**: 책 내용에서 현실(투자, 직장, 리더십 등)로 확장된 논의도 빠짐없이 포함
 5. **곁가지**: 메인 주제에서 파생된 흥미로운 논의는 "곁가지:" 라벨로 따로 표기
 
-### 출력 형식
+### 출력 형식 — 풍부한 HTML 스타일
+
+**반드시 인라인 CSS가 포함된 HTML로 출력한다.** 웹사이트에서 직접 렌더링되므로 시각적 가시성이 매우 중요하다.
+
+#### 필수 스타일 규칙:
+1. **제목**: 큰 폰트 + 색상 배경 + 패딩. 예: `<h1 style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:24px;">`
+2. **섹션 제목(h2)**: 왼쪽 컬러 보더 + 배경. 예: `<h2 style="border-left:4px solid #2563eb;padding:8px 16px;background:#eff6ff;border-radius:0 8px 8px 0;color:#1e40af;">`
+3. **인물별 색상 구분**: 각 참석자에게 고유 색상을 부여. 이름 언급 시 `<span style="background:#색상;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;">이름</span>` 형태의 뱃지로 표시
+4. **AI 코멘트**: 눈에 띄는 배경 + 아이콘. 예: `<div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;">🤖 ...</div>`
+5. **논쟁 심판**: 빨간 계열 배경. 예: `<div style="background:#fee2e2;border-left:4px solid #ef4444;padding:12px 16px;border-radius:0 8px 8px 0;">🔥 ... ⚖️ ...</div>`
+6. **테이블**: 헤더에 색상 배경, 교차 행 색상, 보더. 예: `<th style="background:#1e40af;color:#fff;padding:10px 14px;">`
+7. **인용/명언**: 이탤릭 + 들여쓰기 + 색상 왼쪽 보더. 예: `<blockquote style="border-left:3px solid #8b5cf6;padding:8px 16px;color:#6d28d9;font-style:italic;background:#f5f3ff;">`
+8. **핵심 키워드**: `<mark style="background:#fde68a;padding:2px 4px;border-radius:2px;">키워드</mark>` 형태로 하이라이트
+9. **곁가지**: 회색 배경 박스. `<div style="background:#f9fafb;border:1px dashed #d1d5db;padding:12px 16px;border-radius:8px;margin:12px 0;">`
+10. **시상 카드**: 각 상마다 카드형 UI. 배경 그라데이션, 둥근 모서리, 그림자
+
+#### 다운로드(.doc) 호환:
+- 인라인 CSS만 사용 (외부 stylesheet 금지)
+- `<style>` 태그가 아닌 각 요소에 직접 style 속성
+- 이렇게 하면 Word에서 열어도 서식이 유지됨
+
+#### 예시 구조:
+```html
+<h1 style="background:linear-gradient(...);">삼국지 정사 촉서 독서토론 정리</h1>
+<p style="color:#6b7280;">참석: <span style="background:#2563eb;...">성한</span> ...</p>
+<h2 style="border-left:4px solid #2563eb;...">1. 발제 — 왜 촉서인가</h2>
+<p>내용...</p>
+<div style="background:#fef3c7;...">🤖 AI 코멘트: ...</div>
 ```
-[책 제목] 독서토론 정리
-
-참석: OOO(발제·진행) · OOO · OOO    |    분량: 약 N시간 N분
-
-※ STT 관련 안내
-
-1. 발제 — 왜 「[책 제목]」인가 (발제자)
-[내용]
-
-2. [토론 주제 1]
-[내용]
-
-3. [토론 주제 2]
-[내용]
-
-...
 
 N. 각자의 평점과 소감
 [이름] (N점): [소감]
