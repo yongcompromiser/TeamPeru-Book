@@ -160,8 +160,14 @@ export default function BookDetailPage({ params }: PageProps) {
                 </div>
               )}
 
+              {book.created_at && (
+                <p className="text-sm text-gray-500 mt-2">
+                  등록일: {new Date(book.created_at).toLocaleDateString('ko-KR')}
+                </p>
+              )}
+
               {book.isbn && (
-                <p className="text-sm text-gray-500 mt-2">ISBN: {book.isbn}</p>
+                <p className="text-sm text-gray-500 mt-1">ISBN: {book.isbn}</p>
               )}
 
               {canDelete && (
