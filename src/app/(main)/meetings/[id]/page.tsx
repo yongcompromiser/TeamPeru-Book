@@ -159,12 +159,20 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const handleSaveMinutes = async () => {
     setIsSavingMinutes(true);
     try {
-      await fetch(`/api/meetings/${id}/minutes`, {
+      const res = await fetch(`/api/meetings/${id}/minutes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw_text: minutesRaw, summary: minutesSummary }),
       });
-    } catch {}
+      if (res.ok) {
+        alert('저장되었습니다');
+      } else {
+        const data = await res.json();
+        alert('저장 실패: ' + (data.error || '알 수 없는 오류'));
+      }
+    } catch (e) {
+      alert('저장 중 오류가 발생했습니다');
+    }
     setIsSavingMinutes(false);
   };
 
