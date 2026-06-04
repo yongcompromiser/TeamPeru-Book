@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
 import { Calendar, BookOpen, User } from 'lucide-react';
 import Link from 'next/link';
+import { BookVoteCard } from '@/components/features/book-vote-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -206,74 +207,12 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Featured Book */}
-        <Card className="overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-4">
-            <div className="flex items-center gap-2 text-white">
-              <BookOpen className="w-5 h-5" />
-              <span className="font-medium">이번 책</span>
-            </div>
-          </div>
-          <CardContent className="pt-6">
-            {featuredBook ? (
-              <div className="flex gap-6">
-                {/* Book Cover */}
-                <div className="flex-shrink-0">
-                  {featuredBook.cover_url ? (
-                    <img
-                      src={featuredBook.cover_url}
-                      alt={featuredBook.title}
-                      className="w-32 h-44 object-cover rounded-lg shadow-md"
-                    />
-                  ) : (
-                    <div className="w-32 h-44 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <BookOpen className="w-12 h-12 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Book Info */}
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-bold text-gray-900 leading-tight">
-                    {featuredBook.title}
-                  </h2>
-                  <p className="text-gray-600 mt-1">{featuredBook.author}</p>
-
-                  {featuredPresenter && (
-                    <div className="flex items-center gap-1 text-sm text-emerald-600 mt-2">
-                      <User className="w-4 h-4" />
-                      <span>발제자: {featuredPresenter.name}</span>
-                    </div>
-                  )}
-
-                  {featuredBook.description && (
-                    <p className="text-sm text-gray-600 mt-3 line-clamp-3">
-                      {featuredBook.description}
-                    </p>
-                  )}
-
-                  <Link
-                    href={`/books/${featuredBook.id}`}
-                    className="inline-block mt-3 text-emerald-600 hover:underline text-sm"
-                  >
-                    자세히 보기 →
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">선정된 책이 없습니다</p>
-                <Link
-                  href="/books"
-                  className="inline-block mt-3 text-emerald-600 hover:underline text-sm"
-                >
-                  책 목록 보기
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Featured Book / 후보 투표 */}
+        <BookVoteCard
+          scheduleId={nextSchedule?.id || null}
+          featuredBook={featuredBook}
+          featuredPresenter={featuredPresenter}
+        />
       </div>
     </div>
   );
