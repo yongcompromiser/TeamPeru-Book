@@ -1,59 +1,60 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Loader2, Check } from 'lucide-react';
 
 // 기존(이메일) 회원이 자기 계정에 카카오를 "추가 연결"하는 영역.
-// 로그인된 상태에서 linkIdentity 를 호출하면 새 계정이 생기지 않고
-// 현재 계정에 카카오 identity 가 붙어, 이후 이메일/카카오 둘 다로 로그인할 수 있다.
-//
-// 연결 상태는 별도 네트워크 호출(getUserIdentities) 대신 이미 로그인 세션에
-// 들어있는 user.identities 를 그대로 읽는다. (네트워크 호출은 간헐적으로 멈춰
-// "불러오는 중..." 스피너에서 빠져나오지 못하는 문제가 있었다)
+// 직접 구현한 흐름(/api/auth/kakao/start?mode=link)으로 이동하면 콜백에서
+// 현재 계정의 profiles.kakao_id 에 카카오 id 를 매핑한다. 이후 카카오로 로그인하면
+// 같은 계정으로 들어온다. 연결 여부는 profile.kakao_id 로 판단한다.
 export function KakaoLinkSection() {
-  const supabase = createClient();
-  const { user, isLoading } = useAuth();
+  const { profile, isLoading } = useAuth();
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const identities = user?.identities ?? [];
-  const kakaoIdentity = identities.find((i) => i.provider === 'kakao');
-  const kakaoLinked = !!kakaoIdentity;
-  // 카카오 연결만 있고 다른 로그인 수단이 없으면 해제 불가(로그인 수단이 사라짐)
-  const canUnlink = kakaoLinked && identities.length > 1;
-
-  const handleLink = async () => {
-    setWorking(true);
-    setMessage(null);
-    // 카카오 동의 화면으로 리다이렉트 → /auth/callback 에서 세션 교환 후 /profile 로 복귀
-    const { error } = await supabase.auth.linkIdentity({
-      provider: 'kakao',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/profile`,
-        scopes: 'profile_nickname',
-      },
-    });
-    // 성공 시 카카오로 리다이렉트되므로 아래는 보통 실행되지 않음
-    if (error) {
-      setMessage({ type: 'error', text: `연결에 실패했습니다: ${error.message}` });
-      setWorking(false);
+  // 콜백에서 ?linked / ?error 로 돌아오면 결과 메시지를 보여주고 URL 을 정리한다.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('linked') === 'kakao') {
+      setMessage({ type: 'success', text: '카카오 계정이 연결되었습니다.' });
+      window.history.replaceState({}, '', '/profile');
+    } else if (params.get('error')) {
+      const text =
+        params.get('error') === 'kakao_already_linked'
+          ? '이미 다른 계정에 연결된 카카오입니다.'
+          : '카카오 연결에 실패했습니다. 다시 시도해주세요.';
+      setMessage({ type: 'error', text });
+      window.history.replaceState({}, '', '/profile');
     }
+  }, []);
+
+  const kakaoLinked = !!profile?.kakao_id;
+  // 카카오로만 가입한 계정(@kakao.local)은 해제하면 로그인 수단이 사라지므로 숨긴다
+  const isKakaoOnly = (profile?.email ?? '').endsWith('@kakao.local');
+  const canUnlink = kakaoLinked && !isKakaoOnly;
+
+  const handleConnect = () => {
+    setWorking(true);
+    window.location.href = '/api/auth/kakao/start?mode=link';
   };
 
   const handleUnlink = async () => {
-    if (!kakaoIdentity) return;
     setWorking(true);
     setMessage(null);
-    const { error } = await supabase.auth.unlinkIdentity(kakaoIdentity);
-    if (error) {
-      setMessage({ type: 'error', text: `연결 해제에 실패했습니다: ${error.message}` });
-      setWorking(false);
-    } else {
-      // 세션의 user.identities 를 갱신하기 위해 페이지를 새로고침한다.
+    try {
+      const res = await fetch('/api/auth/kakao/unlink', { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMessage({ type: 'error', text: data.error || '연결 해제에 실패했습니다.' });
+        setWorking(false);
+        return;
+      }
       window.location.reload();
+    } catch {
+      setMessage({ type: 'error', text: '연결 해제 중 오류가 발생했습니다.' });
+      setWorking(false);
     }
   };
 
@@ -95,7 +96,7 @@ export function KakaoLinkSection() {
         <div className="flex flex-col gap-2">
           <button
             type="button"
-            onClick={handleLink}
+            onClick={handleConnect}
             disabled={working}
             className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#FEE500] px-4 text-sm font-medium text-[#191600] transition-opacity hover:opacity-90 disabled:opacity-60 sm:w-auto sm:self-start sm:px-6"
           >

@@ -1,28 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 
-// 카카오 OAuth 로그인 버튼. Supabase 내장 'kakao' provider 사용.
-// 클릭 → 카카오 동의 → Supabase 콜백 → /auth/callback 에서 세션 교환.
+// 카카오 OAuth 로그인 버튼.
+// Supabase 내장 provider 대신 직접 구현한 흐름(/api/auth/kakao/start)으로 이동한다.
+// → 카카오 동의(닉네임) → /api/auth/kakao/callback 에서 세션 발급 → /dashboard
 export function KakaoLoginButton() {
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleKakaoLogin = async () => {
+  const handleKakaoLogin = () => {
     setIsLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'kakao',
-      options: {
-        // 카카오 로그인 후 돌아올 곳. 신규 가입자는 pending → /pending 으로 안내된다.
-        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-        // 카카오 앱에 활성화된 동의항목만 요청한다. (이메일/프로필사진 권한이 없으면
-        // 요청 시 KOE205 에러가 나므로 닉네임만 요청)
-        scopes: 'profile_nickname',
-      },
-    });
-    // 성공 시 카카오로 리다이렉트되므로 이 아래는 보통 실행되지 않음
-    if (error) setIsLoading(false);
+    window.location.href = '/api/auth/kakao/start';
   };
 
   return (

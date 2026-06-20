@@ -29,6 +29,7 @@ export interface Profile {
   name: string;
   avatar_url?: string;
   role: UserRole;
+  kakao_id?: string | null;
   created_at: string;
   updated_at: string;
 }
