@@ -17,9 +17,17 @@ export function KakaoLinkSection() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const loadIdentities = async () => {
-    const { data, error } = await supabase.auth.getUserIdentities();
-    if (!error && data) setIdentities(data.identities);
-    setLoading(false);
+    // getUserIdentities 가 세션/네트워크 이슈로 throw 하면 로딩이 끝나지 않아
+    // 스피너에서 멈춘다. 무슨 일이 있어도 로딩을 끝내고, 못 가져오면 빈 배열로 둬
+    // 최소한 "연결하기" 버튼은 보이도록 한다.
+    try {
+      const { data, error } = await supabase.auth.getUserIdentities();
+      setIdentities(!error && data ? data.identities : []);
+    } catch {
+      setIdentities([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
