@@ -42,3 +42,9 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# Claude Code 로컬 설정 (PC마다 다름)
+.claude/
+
+# 다른 세션 참고용 로컬 문서 (저장소에 불필요)
+STOCK_SESSION_REFERENCE.md

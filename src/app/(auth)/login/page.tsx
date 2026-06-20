@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { KakaoLoginButton } from '@/components/auth/kakao-login-button';
 
 const loginSchema = z.object({
   email: z.string().email('유효한 이메일을 입력해주세요'),
@@ -142,6 +143,7 @@ export default function LoginPage() {
         )}
 
         {mode === 'login' ? (
+          <>
           <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
             <Input
               id="email"
@@ -178,6 +180,16 @@ export default function LoginPage() {
               </Link>
             </div>
           </form>
+
+          {/* 소셜 로그인 구분선 */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs text-gray-400">또는</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <KakaoLoginButton />
+          </>
         ) : (
           <form onSubmit={resetForm.handleSubmit(onReset)} className="space-y-4">
             <Input

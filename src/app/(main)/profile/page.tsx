@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Camera, Loader2 } from 'lucide-react';
+import { KakaoLinkSection } from '@/components/auth/kakao-link-section';
 
 const profileSchema = z.object({
   name: z.string().min(2, '이름은 최소 2자 이상이어야 합니다'),
@@ -213,6 +214,8 @@ export default function ProfilePage() {
                 저장
               </Button>
             </div>
+
+            <KakaoLinkSection />
           </form>
         </CardContent>
       </Card>
