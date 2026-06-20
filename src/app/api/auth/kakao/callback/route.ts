@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { exchangeKakaoCode, fetchKakaoUser } from '@/lib/kakao';
+import { storeKakaoTokens } from '@/lib/kakao-notify';
 
 function getBaseUrl(request: NextRequest): string {
   const forwardedHost = request.headers.get('x-forwarded-host');
@@ -46,8 +47,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const redirectUri = `${base}/api/auth/kakao/callback`;
-    const accessToken = await exchangeKakaoCode(code, redirectUri);
-    const kakaoUser = await fetchKakaoUser(accessToken);
+    const tokens = await exchangeKakaoCode(code, redirectUri);
+    const kakaoUser = await fetchKakaoUser(tokens.accessToken);
     const kakaoId = kakaoUser.id;
     const admin = createAdminClient();
 
@@ -68,6 +69,8 @@ export async function GET(request: NextRequest) {
       if (existing && existing.id !== user.id) return fail('kakao_already_linked');
 
       await admin.from('profiles').update({ kakao_id: kakaoId }).eq('id', user.id);
+      // 알림용 토큰 저장 (talk_message 동의 시 발송 가능)
+      await storeKakaoTokens(admin, user.id, tokens);
 
       const r = NextResponse.redirect(`${base}/profile?linked=kakao`);
       r.cookies.delete('kakao_oauth');
@@ -111,6 +114,16 @@ export async function GET(request: NextRequest) {
       await admin
         .from('profiles')
         .upsert({ id: userId, email, name: kakaoUser.nickname, kakao_id: kakaoId }, { onConflict: 'id' });
+    }
+
+    // 알림용 토큰 저장 (로그인한 카카오 사용자)
+    {
+      const { data: target } = await admin
+        .from('profiles')
+        .select('id')
+        .eq('kakao_id', kakaoId)
+        .maybeSingle();
+      if (target) await storeKakaoTokens(admin, target.id, tokens);
     }
 
     // 3) 세션 발급: magiclink 토큰 생성 → 서버에서 verifyOtp 로 쿠키 세션 설정

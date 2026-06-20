@@ -40,6 +40,23 @@ export function KakaoLinkSection() {
     window.location.href = '/api/auth/kakao/start?mode=link';
   };
 
+  const handleTestNotify = async () => {
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/kakao/notify-self', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMessage({ type: 'success', text: '테스트 알림을 보냈어요! 카카오톡 "나와의 채팅"을 확인하세요.' });
+      } else {
+        setMessage({ type: 'error', text: data.error || '알림 전송에 실패했습니다.' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: '알림 전송 중 오류가 발생했습니다.' });
+    }
+    setWorking(false);
+  };
+
   const handleUnlink = async () => {
     setWorking(true);
     setMessage(null);
@@ -86,11 +103,16 @@ export function KakaoLinkSection() {
             </span>
             카카오 계정이 연결되어 있습니다
           </span>
-          {canUnlink && (
-            <Button type="button" variant="outline" size="sm" onClick={handleUnlink} disabled={working}>
-              {working ? <Loader2 className="w-4 h-4 animate-spin" /> : '연결 해제'}
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleTestNotify} disabled={working}>
+              {working ? <Loader2 className="w-4 h-4 animate-spin" /> : '테스트 알림'}
             </Button>
-          )}
+            {canUnlink && (
+              <Button type="button" variant="outline" size="sm" onClick={handleUnlink} disabled={working}>
+                연결 해제
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
