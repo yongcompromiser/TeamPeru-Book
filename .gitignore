@@ -48,3 +48,6 @@ next-env.d.ts
 
 # 다른 세션 참고용 로컬 문서 (저장소에 불필요)
 STOCK_SESSION_REFERENCE.md
+
+# 클립보드 캡처 임시 파일
+.clip_capture.png

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { UserIdentity } from '@supabase/supabase-js';
+import { useState } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Loader2, Check } from 'lucide-react';
@@ -9,34 +9,21 @@ import { Loader2, Check } from 'lucide-react';
 // 기존(이메일) 회원이 자기 계정에 카카오를 "추가 연결"하는 영역.
 // 로그인된 상태에서 linkIdentity 를 호출하면 새 계정이 생기지 않고
 // 현재 계정에 카카오 identity 가 붙어, 이후 이메일/카카오 둘 다로 로그인할 수 있다.
+//
+// 연결 상태는 별도 네트워크 호출(getUserIdentities) 대신 이미 로그인 세션에
+// 들어있는 user.identities 를 그대로 읽는다. (네트워크 호출은 간헐적으로 멈춰
+// "불러오는 중..." 스피너에서 빠져나오지 못하는 문제가 있었다)
 export function KakaoLinkSection() {
   const supabase = createClient();
-  const [identities, setIdentities] = useState<UserIdentity[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading } = useAuth();
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const loadIdentities = async () => {
-    // getUserIdentities 가 세션/네트워크 이슈로 throw 하면 로딩이 끝나지 않아
-    // 스피너에서 멈춘다. 무슨 일이 있어도 로딩을 끝내고, 못 가져오면 빈 배열로 둬
-    // 최소한 "연결하기" 버튼은 보이도록 한다.
-    try {
-      const { data, error } = await supabase.auth.getUserIdentities();
-      setIdentities(!error && data ? data.identities : []);
-    } catch {
-      setIdentities([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadIdentities();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const kakaoIdentity = identities?.find((i) => i.provider === 'kakao');
+  const identities = user?.identities ?? [];
+  const kakaoIdentity = identities.find((i) => i.provider === 'kakao');
   const kakaoLinked = !!kakaoIdentity;
+  // 카카오 연결만 있고 다른 로그인 수단이 없으면 해제 불가(로그인 수단이 사라짐)
+  const canUnlink = kakaoLinked && identities.length > 1;
 
   const handleLink = async () => {
     setWorking(true);
@@ -63,15 +50,12 @@ export function KakaoLinkSection() {
     const { error } = await supabase.auth.unlinkIdentity(kakaoIdentity);
     if (error) {
       setMessage({ type: 'error', text: `연결 해제에 실패했습니다: ${error.message}` });
+      setWorking(false);
     } else {
-      setMessage({ type: 'success', text: '카카오 연결을 해제했습니다.' });
-      await loadIdentities();
+      // 세션의 user.identities 를 갱신하기 위해 페이지를 새로고침한다.
+      window.location.reload();
     }
-    setWorking(false);
   };
-
-  // 카카오 연결만 있고 다른 로그인 수단이 없으면 해제 불가(로그인 수단이 사라짐)
-  const canUnlink = kakaoLinked && (identities?.length ?? 0) > 1;
 
   return (
     <div className="border-t border-gray-100 pt-4">
@@ -89,7 +73,7 @@ export function KakaoLinkSection() {
         </div>
       )}
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <Loader2 className="w-4 h-4 animate-spin" /> 불러오는 중...
         </div>
