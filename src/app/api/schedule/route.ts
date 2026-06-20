@@ -1,6 +1,14 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { notifyMembers } from '@/lib/kakao-notify';
+
+function getBaseUrl(request: Request): string {
+  const h = request.headers;
+  const host = h.get('x-forwarded-host') ?? h.get('host')!;
+  const proto = h.get('x-forwarded-proto') ?? (process.env.NODE_ENV === 'development' ? 'http' : 'https');
+  return `${proto}://${host}`;
+}
 
 export async function GET(request: Request) {
   try {
@@ -142,6 +150,30 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
+
+      // 전원에게 카톡 "나에게 보내기" 알림 (실패해도 일정 확정은 성공 처리)
+      try {
+        const meetingDate = new Date(date);
+        const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+        const dateLabel = `${format(meetingDate, 'yyyy년 M월 d일')} (${WEEKDAYS[meetingDate.getDay()]})`;
+
+        let bookLabel = '';
+        if (bookId) {
+          const { data: b } = await supabase.from('books').select('title').eq('id', bookId).single();
+          if (b?.title) bookLabel = `\n📖 ${b.title}`;
+        }
+        let presenterLabel = '';
+        if (presenterId) {
+          const { data: p } = await supabase.from('profiles').select('name').eq('id', presenterId).single();
+          if (p?.name) presenterLabel = `\n🎤 발제: ${p.name}`;
+        }
+
+        const text = `📅 [팀페루 독서토론] 새 모임이 확정됐어요!\n🗓️ ${dateLabel} 정기 모임${bookLabel}${presenterLabel}`;
+        await notifyMembers(text, `${getBaseUrl(request)}/schedule`);
+      } catch (e) {
+        console.error('일정 확정 알림 실패:', e);
+      }
+
       return NextResponse.json({ success: true });
     }
 
