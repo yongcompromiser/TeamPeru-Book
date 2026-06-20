@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/utils';
 import { Calendar, BookOpen, User } from 'lucide-react';
 import Link from 'next/link';
 import { BookVoteCard } from '@/components/features/book-vote-card';
+import { Avatar } from '@/components/ui/avatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export default async function DashboardPage() {
     if (schedule.presenter_id) {
       const { data: p } = await supabase
         .from('profiles')
-        .select('name')
+        .select('name, avatar_url')
         .eq('id', schedule.presenter_id)
         .single();
       presenter = p;
@@ -72,7 +73,7 @@ export default async function DashboardPage() {
     // Fetch all members (role = member or admin)
     const { data: members } = await adminClient
       .from('profiles')
-      .select('id, name')
+      .select('id, name, avatar_url')
       .in('role', ['member', 'admin']);
 
     const submissionMap = new Map(
@@ -83,6 +84,7 @@ export default async function DashboardPage() {
       const sub = submissionMap.get(m.id) as any;
       return {
         name: m.name,
+        avatar_url: m.avatar_url,
         discussion: !!(sub?.discussion && sub.discussion.trim() !== ''),
         rating: sub?.rating != null,
         oneLiner: !!(sub?.one_liner && sub.one_liner.trim() !== ''),
@@ -139,7 +141,7 @@ export default async function DashboardPage() {
                 {nextSchedule.presenter && (
                   <div className="flex items-center gap-1 text-blue-600">
                     <User className="w-4 h-4" />
-                    <span>발제자: {nextSchedule.presenter.name}</span>
+                    <span className="inline-flex items-center gap-1.5">발제자: <Avatar src={nextSchedule.presenter.avatar_url} name={nextSchedule.presenter.name} size="xs" />{nextSchedule.presenter.name}</span>
                   </div>
                 )}
 
@@ -173,7 +175,7 @@ export default async function DashboardPage() {
                         <tbody>
                           {nextSchedule.participantStatus.map((p: any) => (
                             <tr key={p.name} className="border-t border-gray-100">
-                              <td className="py-1 pr-2 font-medium text-gray-800">{p.name}</td>
+                              <td className="py-1 pr-2 font-medium text-gray-800"><span className="inline-flex items-center gap-1.5"><Avatar src={p.avatar_url} name={p.name} size="xs" />{p.name}</span></td>
                               <td className="py-1 px-1 text-center">{p.discussion ? <span className="text-green-600">✓</span> : <span className="text-red-400">✗</span>}</td>
                               <td className="py-1 px-1 text-center">{p.rating ? <span className="text-green-600">✓</span> : <span className="text-red-400">✗</span>}</td>
                               <td className="py-1 px-1 text-center">{p.oneLiner ? <span className="text-green-600">✓</span> : <span className="text-red-400">✗</span>}</td>

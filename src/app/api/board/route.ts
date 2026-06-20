@@ -19,14 +19,14 @@ export async function GET() {
     const userIds = [...new Set(posts.map(p => p.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, avatar_url')
       .in('id', userIds);
 
-    const profileMap = new Map(profiles?.map(p => [p.id, p.name]) || []);
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
     const postsWithProfile = posts.map(p => ({
       ...p,
-      profile: { name: profileMap.get(p.user_id) || '알 수 없음' }
+      profile: { name: profileMap.get(p.user_id)?.name || '알 수 없음', avatar_url: profileMap.get(p.user_id)?.avatar_url || null }
     }));
 
     return NextResponse.json({ posts: postsWithProfile });

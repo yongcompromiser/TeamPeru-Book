@@ -24,14 +24,14 @@ export async function GET(
     const userIds = [...new Set(comments.map(c => c.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, avatar_url')
       .in('id', userIds);
 
-    const profileMap = new Map(profiles?.map(p => [p.id, p.name]) || []);
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
     const commentsWithProfile = comments.map(c => ({
       ...c,
-      profile: { name: profileMap.get(c.user_id) || '알 수 없음' }
+      profile: { name: profileMap.get(c.user_id)?.name || '알 수 없음', avatar_url: profileMap.get(c.user_id)?.avatar_url || null }
     }));
 
     return NextResponse.json({ comments: commentsWithProfile });
@@ -81,14 +81,14 @@ export async function POST(
     // 프로필 정보 별도 조회
     const { data: profile } = await supabase
       .from('profiles')
-      .select('name')
+      .select('name, avatar_url')
       .eq('id', user.id)
       .single();
 
     return NextResponse.json({
       comment: {
         ...data,
-        profile: { name: profile?.name || '알 수 없음' }
+        profile: { name: profile?.name || '알 수 없음', avatar_url: profile?.avatar_url || null }
       }
     });
   } catch (error) {

@@ -29,7 +29,7 @@ export async function GET(
     if (schedule.presenter_id) {
       const { data: p } = await supabase
         .from('profiles')
-        .select('id, name')
+        .select('id, name, avatar_url')
         .eq('id', schedule.presenter_id)
         .single();
       presenter = p;

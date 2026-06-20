@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/avatar';
 
 interface BookVoteCardProps {
   scheduleId: string | null;
@@ -107,7 +108,7 @@ export function BookVoteCard({ scheduleId, featuredBook, featuredPresenter }: Bo
               {featuredPresenter && (
                 <div className="flex items-center gap-1 text-sm text-emerald-600 mt-2">
                   <User className="w-4 h-4" />
-                  <span>발제자: {featuredPresenter.name}</span>
+                  <span className="inline-flex items-center gap-1.5">발제자: <Avatar src={featuredPresenter.avatar_url} name={featuredPresenter.name} size="xs" />{featuredPresenter.name}</span>
                 </div>
               )}
               {featuredBook.description && (

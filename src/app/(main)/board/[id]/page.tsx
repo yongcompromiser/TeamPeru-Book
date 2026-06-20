@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Clock, Send, Loader2, Trash2, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/avatar';
 
 interface Post {
   id: string;
@@ -17,7 +18,7 @@ interface Post {
   content: string;
   user_id: string;
   created_at: string;
-  profile?: { name: string };
+  profile?: { name: string; avatar_url?: string | null };
 }
 
 interface Comment {
@@ -26,7 +27,7 @@ interface Comment {
   user_id: string;
   content: string;
   created_at: string;
-  profile?: { name: string };
+  profile?: { name: string; avatar_url?: string | null };
 }
 
 interface PageProps {
@@ -148,7 +149,7 @@ export default function PostDetailPage({ params }: PageProps) {
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                 <span className="flex items-center gap-1">
                   <User className="w-4 h-4" />
-                  {post.profile?.name || '알 수 없음'}
+                  <span className="inline-flex items-center gap-1.5"><Avatar src={post.profile?.avatar_url} name={post.profile?.name || ''} size="xs" />{post.profile?.name || '알 수 없음'}</span>
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
@@ -199,8 +200,8 @@ export default function PostDetailPage({ params }: PageProps) {
                   )}
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm text-gray-900">
-                      {comment.profile?.name || '알 수 없음'}
+                    <span className="font-medium text-sm text-gray-900 inline-flex items-center gap-1.5">
+                      <Avatar src={comment.profile?.avatar_url} name={comment.profile?.name || ''} size="xs" />{comment.profile?.name || '알 수 없음'}
                     </span>
                     <span className="text-xs text-gray-400">
                       {format(new Date(comment.created_at), 'M/d HH:mm')}

@@ -20,17 +20,17 @@ export async function GET() {
     const userIds = [...new Set(recaps.map(r => r.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, avatar_url')
       .in('id', userIds);
 
-    const profileMap = new Map(profiles?.map(p => [p.id, p.name]) || []);
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
     // Flatten all photos into a single array with metadata
     const allPhotos: { url: string; title: string; author: string }[] = [];
 
     for (const recap of recaps) {
       if (recap.photos && Array.isArray(recap.photos)) {
-        const authorName = profileMap.get(recap.user_id) || '';
+        const authorName = profileMap.get(recap.user_id)?.name || '';
         for (const photo of recap.photos) {
           allPhotos.push({
             url: photo,
@@ -43,7 +43,7 @@ export async function GET() {
 
     const recapsWithProfile = recaps.map(r => ({
       ...r,
-      profile: { name: profileMap.get(r.user_id) || '알 수 없음' }
+      profile: { name: profileMap.get(r.user_id)?.name || '알 수 없음', avatar_url: profileMap.get(r.user_id)?.avatar_url || null }
     }));
 
     return NextResponse.json({ photos: allPhotos, recaps: recapsWithProfile });

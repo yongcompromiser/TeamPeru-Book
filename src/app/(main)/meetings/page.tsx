@@ -10,9 +10,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, Book, ChevronRight, LayoutGrid, Table, MapPin, Clock, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/avatar';
 
 interface Rating {
   name: string;
+  avatar_url?: string | null;
   rating: number;
 }
 
@@ -26,7 +28,7 @@ interface Schedule {
   selected_book_id: string | null;
   status: string;
   is_revealed: boolean;
-  presenter?: { name: string };
+  presenter?: { name: string; avatar_url?: string | null };
   selected_book?: { title: string; author: string; cover_url?: string };
   ratings?: Rating[];
 }
@@ -88,7 +90,7 @@ export default function MeetingsPage() {
           if (schedule.presenter_id) {
             const { data: p } = await supabase
               .from('profiles')
-              .select('name')
+              .select('name, avatar_url')
               .eq('id', schedule.presenter_id)
               .single();
             presenter = p;
@@ -181,7 +183,7 @@ export default function MeetingsPage() {
 
                 <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-sm text-gray-500">
                   {meeting.presenter && (
-                    <span>발제자: {meeting.presenter.name}</span>
+                    <span className="inline-flex items-center gap-1.5">발제자: <Avatar src={meeting.presenter.avatar_url} name={meeting.presenter.name} size="xs" />{meeting.presenter.name}</span>
                   )}
                   {meeting.meeting_time && (
                     <span className="flex items-center gap-1">
@@ -211,7 +213,7 @@ export default function MeetingsPage() {
                     <div className="flex flex-wrap gap-2">
                       {meeting.ratings.map((r, idx) => (
                         <span key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded-full flex items-center gap-1">
-                          {r.name}: {renderStars(r.rating)}
+                          <Avatar src={r.avatar_url} name={r.name} size="xs" />{r.name}: {renderStars(r.rating)}
                         </span>
                       ))}
                     </div>
@@ -282,7 +284,7 @@ export default function MeetingsPage() {
                   </td>
                   <td className="p-3 text-sm text-gray-600">{meeting.meeting_time || '-'}</td>
                   <td className="p-3 text-sm font-medium">{meeting.selected_book?.title || '미선정'}</td>
-                  <td className="p-3 text-sm text-gray-600">{meeting.presenter?.name || '-'}</td>
+                  <td className="p-3 text-sm text-gray-600">{meeting.presenter ? <span className="inline-flex items-center gap-1.5"><Avatar src={meeting.presenter.avatar_url} name={meeting.presenter.name} size="xs" />{meeting.presenter.name}</span> : '-'}</td>
                   <td className="p-3 text-sm text-gray-600">{meeting.location || '-'}</td>
                   {isPast && (
                     <td className="p-3 text-sm">

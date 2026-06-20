@@ -11,7 +11,7 @@ export async function GET(
 
     const { data: post } = await supabase
       .from('board_posts')
-      .select('*, profile:profiles(name)')
+      .select('*, profile:profiles(name, avatar_url)')
       .eq('id', id)
       .single();
 
@@ -21,7 +21,7 @@ export async function GET(
 
     const { data: comments } = await supabase
       .from('board_comments')
-      .select('*, profile:profiles(name)')
+      .select('*, profile:profiles(name, avatar_url)')
       .eq('post_id', id)
       .order('created_at', { ascending: true });
 

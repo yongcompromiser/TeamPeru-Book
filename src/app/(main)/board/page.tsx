@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Plus, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/avatar';
 
 interface Post {
   id: string;
@@ -15,7 +16,7 @@ interface Post {
   content: string;
   user_id: string;
   created_at: string;
-  profile?: { name: string };
+  profile?: { name: string; avatar_url?: string | null };
 }
 
 const POST_IT_COLORS = [
@@ -123,7 +124,7 @@ export default function BoardPage() {
 
                 <div className="absolute bottom-3 left-4 right-4">
                   <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span className="font-medium">{post.profile?.name || '익명'}</span>
+                    <span className="font-medium inline-flex items-center gap-1.5"><Avatar src={post.profile?.avatar_url} name={post.profile?.name || ''} size="xs" />{post.profile?.name || '익명'}</span>
                     <span>{format(new Date(post.created_at), 'M/d', { locale: ko })}</span>
                   </div>
                 </div>

@@ -30,6 +30,7 @@ import {
   Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/avatar';
 
 interface Schedule {
   id: string;
@@ -40,7 +41,7 @@ interface Schedule {
   selected_book_id: string | null;
   status: string;
   is_revealed: boolean;
-  presenter?: { id: string; name: string };
+  presenter?: { id: string; name: string; avatar_url?: string | null };
   selected_book?: { id: string; title: string; author: string; cover_url?: string; selection_reason?: string };
 }
 
@@ -737,8 +738,8 @@ export default function MeetingDetailPage({ params }: PageProps) {
               {schedule.presenter && (
                 <div className="mt-3 flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg">
                   <User className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">
-                    발제자: {schedule.presenter.name}
+                  <span className="text-sm font-medium text-blue-800 inline-flex items-center gap-1.5">
+                    발제자: <Avatar src={schedule.presenter.avatar_url} name={schedule.presenter.name} size="xs" />{schedule.presenter.name}
                   </span>
                 </div>
               )}
@@ -1029,8 +1030,8 @@ export default function MeetingDetailPage({ params }: PageProps) {
                         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                           <User className="w-4 h-4 text-blue-600" />
                         </div>
-                        <span className="font-medium text-gray-900">
-                          {submission.profile?.name || '알 수 없음'}
+                        <span className="font-medium text-gray-900 inline-flex items-center gap-1.5">
+                          <Avatar src={submission.profile?.avatar_url} name={submission.profile?.name || ''} size="xs" />{submission.profile?.name || '알 수 없음'}
                         </span>
                       </div>
                       {submission.rating && (

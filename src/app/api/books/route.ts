@@ -8,7 +8,7 @@ export async function GET() {
 
     const { data: books } = await supabase
       .from('books')
-      .select('*, created_by_profile:profiles!books_created_by_fkey(name)')
+      .select('*, created_by_profile:profiles!books_created_by_fkey(name, avatar_url)')
       .order('created_at', { ascending: false });
 
     return NextResponse.json({ books: books || [] });

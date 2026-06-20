@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     // 투표 조회
     const { data: votes } = await supabase
       .from('schedule_votes')
-      .select('*, profile:profiles(name)')
+      .select('*, profile:profiles(name, avatar_url)')
       .gte('vote_date', format(start, 'yyyy-MM-dd'))
       .lte('vote_date', format(end, 'yyyy-MM-dd'));
 
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
         if (schedule.presenter_id) {
           const { data: p } = await supabase
             .from('profiles')
-            .select('name')
+            .select('name, avatar_url')
             .eq('id', schedule.presenter_id)
             .single();
           presenter = p;
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
     // 멤버 조회
     const { data: members } = await supabase
       .from('profiles')
-      .select('id, name');
+      .select('id, name, avatar_url');
 
     // 가능한 책 조회
     const { data: availableBooks } = await supabase

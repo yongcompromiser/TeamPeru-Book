@@ -42,14 +42,14 @@ export async function POST(
     // 프로필 정보 조회
     const { data: profile } = await supabase
       .from('profiles')
-      .select('name')
+      .select('name, avatar_url')
       .eq('id', user.id)
       .single();
 
     return NextResponse.json({
       comment: {
         ...data,
-        profile: { name: profile?.name || '알 수 없음' }
+        profile: { name: profile?.name || '알 수 없음', avatar_url: profile?.avatar_url || null }
       }
     });
   } catch (error) {

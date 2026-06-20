@@ -31,12 +31,12 @@ export async function GET() {
         schedules.map(async (schedule) => {
           let presenter = null;
           let selected_book = null;
-          let ratings: { name: string; rating: number }[] = [];
+          let ratings: { name: string; avatar_url: string | null; rating: number }[] = [];
 
           if (schedule.presenter_id) {
             const { data: p } = await supabase
               .from('profiles')
-              .select('name')
+              .select('name, avatar_url')
               .eq('id', schedule.presenter_id)
               .single();
             presenter = p;
@@ -63,12 +63,13 @@ export async function GET() {
               const userIds = submissions.map((s: any) => s.user_id);
               const { data: profiles } = await supabase
                 .from('profiles')
-                .select('id, name')
+                .select('id, name, avatar_url')
                 .in('id', userIds);
 
-              const profileMap = new Map(profiles?.map((p: any) => [p.id, p.name]) || []);
+              const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
               ratings = submissions.map((s: any) => ({
-                name: profileMap.get(s.user_id) || '알 수 없음',
+                name: profileMap.get(s.user_id)?.name || '알 수 없음',
+                avatar_url: profileMap.get(s.user_id)?.avatar_url || null,
                 rating: s.rating
               }));
             }

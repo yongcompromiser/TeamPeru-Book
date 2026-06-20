@@ -9,6 +9,7 @@ import { ArrowLeft, BookOpen, Tag, User, Pencil, Check, X, Loader2, Trash2 } fro
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { BOOK_STATUS_LABELS } from '@/types';
+import { Avatar } from '@/components/ui/avatar';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -156,7 +157,7 @@ export default function BookDetailPage({ params }: PageProps) {
               {book.created_by_profile && (
                 <div className="flex items-center gap-1 mt-2 text-sm text-gray-500">
                   <User className="w-4 h-4" />
-                  <span>등록: {book.created_by_profile.name}</span>
+                  <span className="inline-flex items-center gap-1.5">등록: <Avatar src={book.created_by_profile.avatar_url} name={book.created_by_profile.name} size="xs" />{book.created_by_profile.name}</span>
                 </div>
               )}
 
