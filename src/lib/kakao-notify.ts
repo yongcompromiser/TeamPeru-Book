@@ -8,22 +8,28 @@ import { refreshKakaoToken, sendKakaoMemo, type KakaoTokens } from '@/lib/kakao'
 
 type Admin = SupabaseClient;
 
-// 로그인/연결 시 받은 토큰을 저장(업서트)
+// 로그인/연결 시 받은 토큰을 저장(업서트).
+// 토큰 저장 실패(예: 마이그레이션 미적용)가 로그인을 막으면 안 되므로 삼킨다.
 export async function storeKakaoTokens(admin: Admin, userId: string, tokens: KakaoTokens): Promise<void> {
-  const now = Date.now();
-  await admin.from('kakao_tokens').upsert(
-    {
-      user_id: userId,
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
-      access_expires_at: new Date(now + tokens.expiresIn * 1000).toISOString(),
-      refresh_expires_at: tokens.refreshTokenExpiresIn
-        ? new Date(now + tokens.refreshTokenExpiresIn * 1000).toISOString()
-        : null,
-      updated_at: new Date(now).toISOString(),
-    },
-    { onConflict: 'user_id' }
-  );
+  try {
+    const now = Date.now();
+    const { error } = await admin.from('kakao_tokens').upsert(
+      {
+        user_id: userId,
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
+        access_expires_at: new Date(now + tokens.expiresIn * 1000).toISOString(),
+        refresh_expires_at: tokens.refreshTokenExpiresIn
+          ? new Date(now + tokens.refreshTokenExpiresIn * 1000).toISOString()
+          : null,
+        updated_at: new Date(now).toISOString(),
+      },
+      { onConflict: 'user_id' }
+    );
+    if (error) console.error('storeKakaoTokens 실패:', userId, error.message);
+  } catch (e) {
+    console.error('storeKakaoTokens 예외:', userId, e);
+  }
 }
 
 // 유효한 access token 을 돌려준다. 만료가 임박하면 refresh 로 갱신한다.
