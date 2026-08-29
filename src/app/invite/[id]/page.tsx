@@ -68,7 +68,15 @@ export default function InvitePage({ params }: PageProps) {
       if (res.ok) {
         setSubmitted(true);
       } else {
-        setError(data.error || '신청에 실패했습니다. 다시 시도해주세요.');
+        // 서버의 코드성 에러(not_found 등)는 그대로 노출하지 않고 친화 문구로 변환.
+        // 한글이 담긴 메시지는 사용자용이므로 그대로 사용.
+        let msg = '신청에 실패했어요. 다시 시도해주세요.';
+        if (res.status === 404 || data.error === 'not_found') {
+          msg = '초대가 마감되었어요. 모임 관리자에게 문의해주세요.';
+        } else if (typeof data.error === 'string' && /[가-힣]/.test(data.error)) {
+          msg = data.error;
+        }
+        setError(msg);
       }
     } catch {
       setError('신청 중 오류가 발생했습니다.');

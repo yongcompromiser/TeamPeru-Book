@@ -103,29 +103,62 @@ export async function GET(
       .eq('schedule_id', id)
       .order('created_at', { ascending: false });
 
-    // 게스트 참석 신청(RSVP) - 관리자에게만 개인정보 포함해 반환
-    let rsvps: any[] = [];
+    // 요청자 권한 판정 (제출물 공개 게이트 + RSVP 노출 판정)
+    let isAdmin = false;
     if (user) {
       const { data: me } = await adminClient
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
-      if (me?.role === 'admin') {
-        const { data: rsvpData } = await adminClient
-          .from('meeting_rsvps')
-          .select('*')
-          .eq('schedule_id', id)
-          .order('created_at', { ascending: false });
-        rsvps = rsvpData || [];
+      isAdmin = me?.role === 'admin';
+    }
+    const isPresenter = !!user && schedule.presenter_id === user.id;
+    const canSeeAll = !!schedule.is_revealed || isAdmin || isPresenter;
+
+    // 제출 현황(로스터)용 메타데이터 — 내용은 빼고 집계값만 (공개 전 유출 방지)
+    const roster = (submissions || []).map((s: any) => {
+      let charCount = 0;
+      try {
+        const parsed = JSON.parse(s.discussion || '[]');
+        charCount = Array.isArray(parsed)
+          ? parsed.reduce((sum: number, d: string) => sum + (d?.length || 0), 0)
+          : (s.discussion?.length || 0);
+      } catch {
+        charCount = s.discussion?.length || 0;
       }
+      charCount += s.one_liner?.length || 0;
+      return {
+        user_id: s.user_id,
+        char_count: charCount,
+        has_rating: s.rating != null,
+        has_one_liner: !!s.one_liner,
+      };
+    });
+
+    // 공개(reveal) 전에는 본인 제출물만, 댓글도 숨긴다. 공개/관리자/발제자는 전체.
+    const visibleSubmissions = canSeeAll
+      ? (submissions || [])
+      : (submissions || []).filter((s: any) => s.user_id === user?.id);
+    const visibleComments = canSeeAll ? comments : [];
+
+    // 게스트 참석 신청(RSVP) - 관리자에게만 개인정보 포함해 반환
+    let rsvps: any[] = [];
+    if (isAdmin) {
+      const { data: rsvpData } = await adminClient
+        .from('meeting_rsvps')
+        .select('*')
+        .eq('schedule_id', id)
+        .order('created_at', { ascending: false });
+      rsvps = rsvpData || [];
     }
 
     return NextResponse.json({
       schedule: { ...schedule, presenter, selected_book },
-      submissions: submissions || [],
+      submissions: visibleSubmissions,
+      roster,
       allMembers: allMembers || [],
-      comments,
+      comments: visibleComments,
       records: records || [],
       rsvps,
       currentUserId: user?.id || null

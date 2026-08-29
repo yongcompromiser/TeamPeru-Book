@@ -242,24 +242,19 @@ export default function MeetingDetailPage({ params }: PageProps) {
             setSubmissions(mine ? [mine] : []);
           }
 
-          // 제출 현황
-          const statuses: SubmissionStatus[] = data.submissions.map((submission: Submission) => {
-            const member = (data.allMembers || []).find((m: { id: string }) => m.id === submission.user_id);
-            let charCount = 0;
-            try {
-              const parsed = JSON.parse(submission.discussion || '[]');
-              charCount = Array.isArray(parsed) ? parsed.join('').length : (submission.discussion?.length || 0);
-            } catch {
-              charCount = submission.discussion?.length || 0;
-            }
+          // 제출 현황 — 서버가 준 roster(집계값만, 내용 없음) 기반으로 구성.
+          // 공개 전 다른 사람의 발제/평점 원문은 서버에서 애초에 내려주지 않는다.
+          const roster = data.roster || [];
+          const statuses: SubmissionStatus[] = roster.map((r: { user_id: string; char_count: number; has_rating: boolean; has_one_liner: boolean }) => {
+            const member = (data.allMembers || []).find((m: { id: string }) => m.id === r.user_id);
             return {
-              user_id: submission.user_id,
-              user_name: member?.name || submission.profile?.name || '알 수 없음',
+              user_id: r.user_id,
+              user_name: member?.name || '알 수 없음',
               has_submitted: true,
-              char_count: charCount,
-              has_rating: !!submission.rating,
-              has_one_liner: !!submission.one_liner,
-              is_guest: (member?.role || submission.profile?.role) === 'guest',
+              char_count: r.char_count,
+              has_rating: r.has_rating,
+              has_one_liner: r.has_one_liner,
+              is_guest: member?.role === 'guest',
             };
           });
           setSubmissionStatuses(statuses);
