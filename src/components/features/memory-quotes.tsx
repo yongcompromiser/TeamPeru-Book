@@ -39,9 +39,10 @@ export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
   useEffect(() => {
     if (!quotes || quotes.length === 0) return;
 
-    const MAX = 5; // 동시에 떠 있는 최대 스티커 수
+    const MAX = 3; // 동시에 떠 있는 최대 스티커 수
     const LIFE = 8200; // 스티커 수명(ms)
-    const SPAWN = 2600; // 새 스티커 생성 간격(ms)
+    const SPAWN = 3200; // 새 스티커 생성 간격(ms)
+    const MIN_GAP = 30; // 스티커 간 최소 중심 거리(% 단위)
 
     // 셔플된 인용구를 순서대로 소비 → 짧은 시간에 같은 문구 중복 최소화
     const order = quotes.map((_, i) => i);
@@ -53,9 +54,11 @@ export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     const pickPos = (existing: Sticker[]) => {
-      // 기존 스티커와 최대한 안 겹치도록 몇 번 시도 (완전 회피는 아니지만 분산)
+      // 기존 스티커와 최소 거리(MIN_GAP)를 확보하도록 여러 번 시도.
+      // 조건을 만족하는 첫 위치를 쓰고, 못 찾으면 가장 멀리 떨어진 위치를 사용.
+      const gap2 = MIN_GAP * MIN_GAP;
       let best = { x: 50, y: 50, d: -1 };
-      for (let t = 0; t < 12; t++) {
+      for (let t = 0; t < 40; t++) {
         const x = 8 + Math.random() * 74; // 8%~82%
         const y = 14 + Math.random() * 60; // 14%~74%
         let dmin = Infinity;
@@ -65,7 +68,7 @@ export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
           const d = dx * dx + dy * dy;
           if (d < dmin) dmin = d;
         }
-        if (existing.length === 0) return { x, y };
+        if (existing.length === 0 || dmin >= gap2) return { x, y };
         if (dmin > best.d) best = { x, y, d: dmin };
       }
       return { x: best.x, y: best.y };
