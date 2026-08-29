@@ -130,6 +130,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [minutesSummary, setMinutesSummary] = useState('');
   const [isSavingMinutes, setIsSavingMinutes] = useState(false);
   const [minutesLoaded, setMinutesLoaded] = useState(false);
+  const [minutesTimedOut, setMinutesTimedOut] = useState(false);
   const [isEditingMinutes, setIsEditingMinutes] = useState(false);
   const [showRawText, setShowRawText] = useState(false);
 
@@ -178,7 +179,12 @@ export default function MeetingDetailPage({ params }: PageProps) {
   };
 
   useEffect(() => {
-    if (activeTab === 'minutes') fetchMinutes();
+    if (activeTab === 'minutes' && !minutesLoaded) {
+      fetchMinutes();
+      // 로딩이 비정상적으로 길어질 경우를 대비한 안전장치(최대 5초 후 스피너 종료)
+      const timer = setTimeout(() => setMinutesTimedOut(true), 5000);
+      return () => clearTimeout(timer);
+    }
   }, [activeTab]);
 
   useEffect(() => {
@@ -1291,7 +1297,17 @@ export default function MeetingDetailPage({ params }: PageProps) {
       </>}
 
       {/* 회의록 탭 */}
-      {activeTab === 'minutes' && <>
+      {activeTab === 'minutes' && (
+        !minutesLoaded && !minutesTimedOut ? (
+          /* 로딩 중: 빈 화면 대신 스피너 (최대 5초) */
+          <Card>
+            <CardContent className="py-16 flex flex-col items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-3" />
+              <p className="text-gray-500 text-sm">회의록을 불러오는 중...</p>
+            </CardContent>
+          </Card>
+        ) : (
+        <>
         {/* 정리본 (HTML 렌더링) */}
         {minutesSummary ? (
           <Card>
@@ -1390,7 +1406,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
             </CardContent>
           )}
         </Card>
-      </>}
+        </>
+        )
+      )}
     </div>
   );
 }
