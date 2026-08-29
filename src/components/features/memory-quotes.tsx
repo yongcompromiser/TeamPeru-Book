@@ -1,87 +1,184 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type Memory = { text: string; name: string; book: string };
 
+type Sticker = {
+  id: number;
+  q: Memory;
+  x: number; // %
+  y: number; // %
+  rot: number; // deg
+  tone: number; // 0..3 색조
+  z: number; // 최근일수록 큼
+  phase: 'in' | 'hold' | 'out';
+};
+
+// 스티커 색조(포스트잇 느낌) — 다크 배경 위에서 은은하게
+const TONES = [
+  { bg: 'rgba(255, 246, 224, 0.94)', bar: '#e0a94b', ink: '#3a2f1a', sub: '#8a6d34' }, // amber
+  { bg: 'rgba(233, 244, 255, 0.94)', bar: '#5b8fd6', ink: '#1f2b3a', sub: '#3f5f86' }, // blue
+  { bg: 'rgba(244, 236, 255, 0.94)', bar: '#8a6fd0', ink: '#2c2340', sub: '#5b4a86' }, // violet
+  { bg: 'rgba(255, 236, 240, 0.94)', bar: '#d3708a', ink: '#3a2028', sub: '#8a4a5e' }, // rose
+];
+
 /**
- * 모임에서 남긴 한줄평들이 화면 곳곳에 추억처럼 떠올랐다 사라진다.
- * 여러 슬롯이 각자 랜덤 위치·랜덤 인용구로 페이드인 → 잠시 머무름 → 페이드아웃 을 반복.
+ * 모임에서 남긴 한줄평이 스티커(포스트잇)처럼 화면 곳곳에 붙었다 사라진다.
+ * - 일정 간격으로 새 스티커가 등장하고, 최근에 생긴 것일수록 위(z-index 최상단)에 배치 → 겹쳐도 최신 것은 항상 읽힘
+ * - 오래된 스티커는 서서히 흐려지고, 수명이 다하면 사라진다
  */
 export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
-  if (!quotes || quotes.length === 0) return null;
-  const slots = Math.min(6, quotes.length);
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-      {Array.from({ length: slots }).map((_, i) => (
-        <QuoteSlot key={i} quotes={quotes} index={i} />
-      ))}
-    </div>
-  );
-}
-
-function QuoteSlot({ quotes, index }: { quotes: Memory[]; index: number }) {
-  const [item, setItem] = useState<{ q: Memory; x: number; y: number } | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [stickers, setStickers] = useState<Sticker[]>([]);
+  const idRef = useRef(0);
+  const zRef = useRef(0);
+  const qiRef = useRef(0);
+  const stickersRef = useRef<Sticker[]>([]);
+  stickersRef.current = stickers;
 
   useEffect(() => {
-    let alive = true;
-    let tid: ReturnType<typeof setTimeout>;
+    if (!quotes || quotes.length === 0) return;
 
-    const roll = () => {
-      const q = quotes[Math.floor(Math.random() * quotes.length)];
-      // 중앙(제목 영역)은 비우고 좌/우 구역에 띄운다.
-      const side = Math.random() < 0.5;
-      const x = side ? 3 + Math.random() * 25 : 56 + Math.random() * 30;
-      const y = 12 + Math.random() * 68;
-      return { q, x, y };
+    const MAX = 5; // 동시에 떠 있는 최대 스티커 수
+    const LIFE = 8200; // 스티커 수명(ms)
+    const SPAWN = 2600; // 새 스티커 생성 간격(ms)
+
+    // 셔플된 인용구를 순서대로 소비 → 짧은 시간에 같은 문구 중복 최소화
+    const order = quotes.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const pickPos = (existing: Sticker[]) => {
+      // 기존 스티커와 최대한 안 겹치도록 몇 번 시도 (완전 회피는 아니지만 분산)
+      let best = { x: 50, y: 50, d: -1 };
+      for (let t = 0; t < 12; t++) {
+        const x = 8 + Math.random() * 74; // 8%~82%
+        const y = 14 + Math.random() * 60; // 14%~74%
+        let dmin = Infinity;
+        for (const s of existing) {
+          const dx = s.x - x;
+          const dy = s.y - y;
+          const d = dx * dx + dy * dy;
+          if (d < dmin) dmin = d;
+        }
+        if (existing.length === 0) return { x, y };
+        if (dmin > best.d) best = { x, y, d: dmin };
+      }
+      return { x: best.x, y: best.y };
     };
 
-    const cycle = () => {
-      if (!alive) return;
-      setItem(roll());
-      setVisible(false);
-      tid = setTimeout(() => {
-        if (!alive) return;
-        setVisible(true); // 페이드 인
-        tid = setTimeout(() => {
-          if (!alive) return;
-          setVisible(false); // 페이드 아웃
-          tid = setTimeout(cycle, 1500); // 잠시 비었다가 다른 자리에 다시
-        }, 4800 + Math.random() * 1600); // 머무는 시간
-      }, 80);
+    const spawn = () => {
+      const qi = order[qiRef.current % order.length];
+      qiRef.current += 1;
+      const q = quotes[qi];
+      const cur = stickersRef.current;
+      const { x, y } = pickPos(cur);
+      const id = idRef.current++;
+      zRef.current += 1;
+      const sticker: Sticker = {
+        id,
+        q,
+        x,
+        y,
+        rot: (Math.random() - 0.5) * 7,
+        tone: Math.floor(Math.random() * TONES.length),
+        z: zRef.current,
+        phase: 'in',
+      };
+
+      setStickers((prev) => {
+        const next = [...prev, sticker];
+        // 최대 개수 초과 시 가장 오래된(작은 z) 것을 out 처리
+        if (next.length > MAX) {
+          const oldest = next.reduce((a, b) => (a.z < b.z ? a : b));
+          return next.map((s) => (s.id === oldest.id ? { ...s, phase: 'out' } : s));
+        }
+        return next;
+      });
+
+      // in → hold
+      timers.push(
+        setTimeout(() => {
+          setStickers((prev) => prev.map((s) => (s.id === id && s.phase === 'in' ? { ...s, phase: 'hold' } : s)));
+        }, 60)
+      );
+      // hold → out
+      timers.push(
+        setTimeout(() => {
+          setStickers((prev) => prev.map((s) => (s.id === id ? { ...s, phase: 'out' } : s)));
+        }, LIFE)
+      );
+      // out 후 제거
+      timers.push(
+        setTimeout(() => {
+          setStickers((prev) => prev.filter((s) => s.id !== id));
+        }, LIFE + 1100)
+      );
     };
 
-    // 슬롯마다 시작 시점을 어긋나게
-    tid = setTimeout(cycle, index * 950 + Math.random() * 700);
+    // 초기 몇 개를 시차 두고 등장
+    spawn();
+    timers.push(setTimeout(spawn, 900));
+    timers.push(setTimeout(spawn, 1800));
+    const interval = setInterval(spawn, SPAWN);
+
     return () => {
-      alive = false;
-      clearTimeout(tid);
+      clearInterval(interval);
+      timers.forEach(clearTimeout);
     };
-  }, [quotes, index]);
+  }, [quotes]);
 
-  if (!item) return null;
+  if (!quotes || quotes.length === 0) return null;
+
+  const maxZ = stickers.reduce((m, s) => Math.max(m, s.z), 0);
 
   return (
-    <div
-      className="absolute max-w-[min(320px,72vw)] text-center transition-all duration-1000 ease-out"
-      style={{
-        left: `${item.x}%`,
-        top: `${item.y}%`,
-        opacity: visible ? 1 : 0,
-        transform: `translateY(${visible ? 0 : 14}px) scale(${visible ? 1 : 0.98})`,
-      }}
-    >
-      <p
-        className="text-sm italic leading-relaxed text-white/90 sm:text-base"
-        style={{ textShadow: '0 2px 12px rgba(0,0,0,0.55)' }}
-      >
-        “{item.q.text}”
-      </p>
-      <p className="mt-1.5 text-xs text-amber-200/60" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
-        — {item.q.name}
-        {item.q.book ? ` · ${item.q.book}` : ''}
-      </p>
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      {stickers.map((s) => {
+        const tone = TONES[s.tone];
+        const visible = s.phase !== 'in' && s.phase !== 'out';
+        const isTop = s.z === maxZ;
+        // 최신 스티커는 또렷하게, 오래될수록 살짝 흐리게(겹쳐도 최신이 읽힘)
+        const age = maxZ - s.z; // 0=최신
+        const dim = visible ? Math.max(0.62, 1 - age * 0.12) : 0;
+        return (
+          <div
+            key={s.id}
+            className="absolute w-[min(300px,74vw)] transition-all duration-700 ease-out"
+            style={{
+              left: `${s.x}%`,
+              top: `${s.y}%`,
+              zIndex: s.z,
+              opacity: dim,
+              transform: `translate(-50%, -50%) rotate(${s.rot}deg) translateY(${visible ? 0 : 16}px) scale(${visible ? (isTop ? 1 : 0.97) : 0.9})`,
+            }}
+          >
+            <div
+              className="rounded-2xl px-5 py-4"
+              style={{
+                background: tone.bg,
+                boxShadow: isTop
+                  ? '0 18px 46px rgba(0,0,0,0.5), 0 2px 0 rgba(255,255,255,0.4) inset'
+                  : '0 10px 30px rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(2px)',
+              }}
+            >
+              <div className="mb-2 h-1 w-8 rounded-full" style={{ background: tone.bar }} />
+              <p className="text-[15px] font-medium leading-snug" style={{ color: tone.ink }}>
+                “{s.q.text}”
+              </p>
+              <p className="mt-2 text-xs font-medium" style={{ color: tone.sub }}>
+                — {s.q.name}
+                {s.q.book ? ` · ${s.q.book}` : ''}
+              </p>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
