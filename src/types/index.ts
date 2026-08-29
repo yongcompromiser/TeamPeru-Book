@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'member' | 'visitor' | 'pending';
+export type UserRole = 'admin' | 'member' | 'visitor' | 'pending' | 'guest';
 
 // 책 상태 타입 (확장 가능)
 export type BookStatus =

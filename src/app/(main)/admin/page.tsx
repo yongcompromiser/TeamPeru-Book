@@ -8,10 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield, Check, X, Clock, Trash2 } from 'lucide-react';
+import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield, Check, X, Clock, Trash2, UserPlus } from 'lucide-react';
 import { Profile } from '@/types';
 
-type RoleType = 'admin' | 'member' | 'visitor' | 'pending';
+type RoleType = 'admin' | 'member' | 'visitor' | 'pending' | 'guest';
 
 interface ProfileWithRole extends Omit<Profile, 'role'> {
   role: RoleType;
@@ -22,6 +22,7 @@ const roleLabels: Record<RoleType, string> = {
   member: '멤버',
   visitor: '방문자',
   pending: '가입대기',
+  guest: '게스트',
 };
 
 const roleBadgeVariant: Record<RoleType, 'info' | 'success' | 'warning' | 'default'> = {
@@ -29,6 +30,7 @@ const roleBadgeVariant: Record<RoleType, 'info' | 'success' | 'warning' | 'defau
   member: 'success',
   visitor: 'warning',
   pending: 'default',
+  guest: 'warning',
 };
 
 export default function AdminPage() {
@@ -36,6 +38,7 @@ export default function AdminPage() {
   const supabase = createClient();
   const [users, setUsers] = useState<ProfileWithRole[]>([]);
   const [pendingUsers, setPendingUsers] = useState<ProfileWithRole[]>([]);
+  const [guestUsers, setGuestUsers] = useState<ProfileWithRole[]>([]);
   const [stats, setStats] = useState({
     users: 0,
     books: 0,
@@ -62,8 +65,9 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         const allUsers = (data.users as ProfileWithRole[]) || [];
-        setUsers(allUsers.filter(u => u.role !== 'pending'));
+        setUsers(allUsers.filter(u => u.role !== 'pending' && u.role !== 'guest'));
         setPendingUsers(allUsers.filter(u => u.role === 'pending'));
+        setGuestUsers(allUsers.filter(u => u.role === 'guest'));
         setStats(data.stats);
         return;
       }
@@ -78,8 +82,9 @@ export default function AdminPage() {
       .order('created_at', { ascending: false });
 
     const allUsers = (usersData as ProfileWithRole[]) || [];
-    setUsers(allUsers.filter(u => u.role !== 'pending'));
+    setUsers(allUsers.filter(u => u.role !== 'pending' && u.role !== 'guest'));
     setPendingUsers(allUsers.filter(u => u.role === 'pending'));
+    setGuestUsers(allUsers.filter(u => u.role === 'guest'));
 
     // Fetch stats
     const [
@@ -216,6 +221,51 @@ export default function AdminPage() {
         </Card>
       )}
 
+      {/* Guests */}
+      {guestUsers.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2 text-amber-800">
+              <UserPlus className="w-5 h-5" />
+              게스트 ({guestUsers.length}명)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {guestUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between bg-white p-4 rounded-lg border"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar src={user.avatar_url} name={user.name} size="sm" />
+                    <div>
+                      <p className="font-medium text-gray-900">{user.name}</p>
+                      <p className="text-sm text-gray-600">
+                        {new Date(user.created_at).toLocaleDateString('ko-KR')} 방문
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => handleApprove(user.id)}>
+                      <Check className="w-4 h-4 mr-1" />
+                      정회원 승격
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => handleDeleteUser(user.id, user.name)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* User Management */}
       <Card>
         <CardHeader>
@@ -310,7 +360,7 @@ export default function AdminPage() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-700">변경할 역할 선택:</p>
               <div className="grid grid-cols-2 gap-2">
-                {(['admin', 'member', 'visitor'] as RoleType[]).map((role) => (
+                {(['admin', 'member', 'guest', 'visitor'] as RoleType[]).map((role) => (
                   <Button
                     key={role}
                     variant={selectedUser.role === role ? 'primary' : 'outline'}

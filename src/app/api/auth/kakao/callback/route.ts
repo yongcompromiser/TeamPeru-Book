@@ -21,14 +21,16 @@ export async function GET(request: NextRequest) {
   const stateParam = request.nextUrl.searchParams.get('state');
 
   // 쿠키에서 저장해둔 state/mode 읽기 (CSRF 방지)
-  let mode: 'login' | 'link' = 'login';
+  let mode: 'login' | 'link' | 'guest' = 'login';
   let savedState = '';
+  let next = '';
   const raw = request.cookies.get('kakao_oauth')?.value;
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      mode = parsed.mode === 'link' ? 'link' : 'login';
+      mode = parsed.mode === 'link' ? 'link' : parsed.mode === 'guest' ? 'guest' : 'login';
       savedState = parsed.state ?? '';
+      next = typeof parsed.next === 'string' && parsed.next.startsWith('/') ? parsed.next : '';
     } catch {
       /* ignore */
     }
@@ -120,10 +122,17 @@ export async function GET(request: NextRequest) {
     {
       const { data: target } = await admin
         .from('profiles')
-        .select('id')
+        .select('id, role')
         .eq('kakao_id', kakaoId)
         .maybeSingle();
-      if (target) await storeKakaoTokens(admin, target.id, tokens);
+      if (target) {
+        await storeKakaoTokens(admin, target.id, tokens);
+        // 게스트 참여로 처음 들어온 신규 사용자는 승인 없이 guest 역할 부여.
+        // 단, 이미 member/admin 인 사용자는 절대 강등하지 않는다(pending 일 때만 승격).
+        if (mode === 'guest' && target.role === 'pending') {
+          await admin.from('profiles').update({ role: 'guest' }).eq('id', target.id);
+        }
+      }
     }
 
     // 3) 세션 발급: magiclink 토큰 생성 → 서버에서 verifyOtp 로 쿠키 세션 설정
@@ -142,7 +151,7 @@ export async function GET(request: NextRequest) {
     });
     if (verifyErr) throw new Error(verifyErr.message);
 
-    const r = NextResponse.redirect(`${base}/dashboard`);
+    const r = NextResponse.redirect(`${base}${next || '/dashboard'}`);
     r.cookies.delete('kakao_oauth');
     return r;
   } catch (e) {

@@ -57,7 +57,7 @@ export async function GET(
       const userIds = submissions.map((s: any) => s.user_id);
       const { data: profiles } = await adminClient
         .from('profiles')
-        .select('id, name, avatar_url')
+        .select('id, name, avatar_url, role')
         .in('id', userIds);
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
       for (const s of submissions as any[]) {
@@ -65,11 +65,11 @@ export async function GET(
       }
     }
 
-    // 전체 멤버 (제출 현황용)
+    // 전체 멤버 (제출 현황용) - 게스트 포함, role 로 뱃지 구분
     const { data: allMembers } = await adminClient
       .from('profiles')
-      .select('id, name')
-      .in('role', ['admin', 'member']);
+      .select('id, name, role')
+      .in('role', ['admin', 'member', 'guest']);
 
     // 댓글
     let comments: any[] = [];
@@ -103,12 +103,31 @@ export async function GET(
       .eq('schedule_id', id)
       .order('created_at', { ascending: false });
 
+    // 게스트 참석 신청(RSVP) - 관리자에게만 개인정보 포함해 반환
+    let rsvps: any[] = [];
+    if (user) {
+      const { data: me } = await adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (me?.role === 'admin') {
+        const { data: rsvpData } = await adminClient
+          .from('meeting_rsvps')
+          .select('*')
+          .eq('schedule_id', id)
+          .order('created_at', { ascending: false });
+        rsvps = rsvpData || [];
+      }
+    }
+
     return NextResponse.json({
       schedule: { ...schedule, presenter, selected_book },
       submissions: submissions || [],
       allMembers: allMembers || [],
       comments,
       records: records || [],
+      rsvps,
       currentUserId: user?.id || null
     });
   } catch (error) {

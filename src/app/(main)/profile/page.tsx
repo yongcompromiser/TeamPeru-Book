@@ -150,9 +150,17 @@ export default function ProfilePage() {
             <div>
               <CardTitle>{profile.name}</CardTitle>
               <p className="text-sm text-gray-600">{profile.email}</p>
-              <Badge variant={profile.role === 'admin' ? 'info' : 'default'} className="mt-1">
-                {profile.role === 'admin' ? '관리자' : '멤버'}
+              <Badge
+                variant={profile.role === 'admin' ? 'info' : profile.role === 'guest' ? 'warning' : 'default'}
+                className="mt-1"
+              >
+                {profile.role === 'admin' ? '관리자' : profile.role === 'guest' ? '게스트' : '멤버'}
               </Badge>
+              {profile.role === 'guest' && (
+                <p className="text-xs text-amber-700 mt-2">
+                  게스트로 이용 중이에요. 정회원이 되고 싶다면 모임 관리자에게 알려주세요 — 관리자 페이지에서 바로 승격해드려요.
+                </p>
+              )}
             </div>
           </div>
         </CardHeader>

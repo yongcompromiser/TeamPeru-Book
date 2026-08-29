@@ -30,6 +30,7 @@ import {
   Download,
   Link2,
   Copy,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
@@ -55,7 +56,7 @@ interface Submission {
   one_liner: string | null;
   rating: number | null;
   created_at: string;
-  profile?: { name: string; avatar_url?: string };
+  profile?: { name: string; avatar_url?: string; role?: string };
 }
 
 interface SubmissionStatus {
@@ -65,6 +66,16 @@ interface SubmissionStatus {
   char_count: number;
   has_rating: boolean;
   has_one_liner: boolean;
+  is_guest: boolean;
+}
+
+interface Rsvp {
+  id: string;
+  name: string;
+  contact: string | null;
+  message: string | null;
+  status: string;
+  created_at: string;
 }
 
 interface Comment {
@@ -100,6 +111,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [mySubmission, setMySubmission] = useState<Submission | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [meetingComments, setMeetingComments] = useState<MeetingComment[]>([]);
+  const [rsvps, setRsvps] = useState<Rsvp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
@@ -242,16 +254,18 @@ export default function MeetingDetailPage({ params }: PageProps) {
             }
             return {
               user_id: submission.user_id,
-              user_name: member?.name || '알 수 없음',
+              user_name: member?.name || submission.profile?.name || '알 수 없음',
               has_submitted: true,
               char_count: charCount,
               has_rating: !!submission.rating,
               has_one_liner: !!submission.one_liner,
+              is_guest: (member?.role || submission.profile?.role) === 'guest',
             };
           });
           setSubmissionStatuses(statuses);
         }
 
+        setRsvps(data.rsvps || []);
         setIsLoading(false);
         return;
       }
@@ -295,13 +309,13 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
     const { data: allMembers } = await supabase
       .from('profiles')
-      .select('id, name')
-      .in('role', ['admin', 'member']);
+      .select('id, name, role')
+      .in('role', ['admin', 'member', 'guest']);
 
     // 제출물 조회
     const { data: submissionsData } = await supabase
       .from('meeting_submissions')
-      .select('*, profile:profiles(name, avatar_url)')
+      .select('*, profile:profiles(name, avatar_url, role)')
       .eq('schedule_id', id);
 
     if (submissionsData) {
@@ -354,11 +368,12 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
         return {
           user_id: submission.user_id,
-          user_name: member?.name || '알 수 없음',
+          user_name: member?.name || submission.profile?.name || '알 수 없음',
           has_submitted: true,
           char_count: charCount,
           has_rating: !!submission.rating,
           has_one_liner: !!submission.one_liner,
+          is_guest: (member?.role || submission.profile?.role) === 'guest',
         };
       });
       setSubmissionStatuses(statuses);
@@ -898,6 +913,34 @@ export default function MeetingDetailPage({ params }: PageProps) {
                 </Button>
               </div>
             )}
+
+            {/* 참석 신청(RSVP) 목록 */}
+            <div className="mt-4 border-t border-gray-100 pt-3">
+              <p className="text-sm font-medium text-gray-800 mb-2 inline-flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-amber-600" />
+                참석 신청 {rsvps.length > 0 && `(${rsvps.length}명)`}
+              </p>
+              {rsvps.length > 0 ? (
+                <div className="space-y-2">
+                  {rsvps.map((r) => (
+                    <div key={r.id} className="flex items-start justify-between gap-3 bg-amber-50/60 rounded-lg px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900">
+                          {r.name}
+                          {r.contact && <span className="ml-2 text-xs font-normal text-gray-500">{r.contact}</span>}
+                        </p>
+                        {r.message && <p className="text-xs text-gray-600 mt-0.5 break-words">{r.message}</p>}
+                      </div>
+                      <span className="text-[11px] text-gray-400 flex-shrink-0">
+                        {format(new Date(r.created_at), 'M/d')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">아직 참석 신청이 없어요.</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1000,6 +1043,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
                     )}>
                       {status.user_name}
                     </span>
+                    {status.is_guest && (
+                      <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">게스트</span>
+                    )}
                   </div>
                   {status.has_submitted && (
                     <div className="text-xs text-gray-500 space-y-0.5 ml-6">
@@ -1133,6 +1179,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
                         </div>
                         <span className="font-medium text-gray-900 inline-flex items-center gap-1.5">
                           <Avatar src={submission.profile?.avatar_url} name={submission.profile?.name || ''} size="xs" />{submission.profile?.name || '알 수 없음'}
+                          {submission.profile?.role === 'guest' && (
+                            <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">게스트</span>
+                          )}
                         </span>
                       </div>
                       {submission.rating && (

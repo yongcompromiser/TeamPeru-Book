@@ -215,6 +215,27 @@ export default function InvitePage({ params }: PageProps) {
           </div>
         )}
 
+        {/* 카카오 게스트 참여 (계정으로 더 깊이 참여) */}
+        <div className="mt-5 text-center">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400">더 깊이 참여하고 싶다면</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+          <a
+            href={`/api/auth/kakao/start?mode=guest&next=/meetings/${id}`}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] px-4 text-sm font-medium text-[#191600] transition-opacity hover:opacity-90"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path fill="#191600" d="M12 3C6.477 3 2 6.477 2 10.8c0 2.77 1.86 5.2 4.66 6.58-.2.72-.74 2.66-.85 3.07-.13.51.19.5.4.37.16-.11 2.6-1.77 3.66-2.49.69.1 1.4.16 2.13.16 5.523 0 10-3.477 10-7.69C24 6.477 17.523 3 12 3Z" />
+            </svg>
+            카카오로 게스트 참여하기
+          </a>
+          <p className="text-xs text-gray-400 mt-2">
+            승인 없이 바로 입장 — 책·회의록을 둘러보고 한줄평·평점을 남길 수 있어요.
+          </p>
+        </div>
+
         <p className="text-center text-xs text-gray-400 mt-6">
           팀 페루 독서토론 · 함께 읽고 나누는 즐거움
         </p>
