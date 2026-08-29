@@ -84,7 +84,7 @@ export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
         q,
         x,
         y,
-        rot: (Math.random() - 0.5) * 7,
+        rot: 0,
         tone: Math.floor(Math.random() * TONES.length),
         z: zRef.current,
         phase: 'in',
@@ -184,7 +184,6 @@ export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
                 </p>
                 <p className="mt-2 text-xs font-medium" style={{ color: tone.sub }}>
                   — {s.q.name}
-                  {s.q.book ? ` · ${s.q.book}` : ''}
                 </p>
               </div>
             </div>
