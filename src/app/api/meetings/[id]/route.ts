@@ -176,6 +176,30 @@ export async function PATCH(
       return NextResponse.json({ success: true });
     }
 
+    if (action === 'toggle_invite') {
+      // 공개 초대 링크 on/off (관리자만)
+      const { data: profile } = await adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.role !== 'admin') {
+        return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 });
+      }
+
+      const { error } = await adminClient
+        .from('schedules')
+        .update({ invite_public: !!body.invite_public })
+        .eq('id', id);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+
+      return NextResponse.json({ success: true, invite_public: !!body.invite_public });
+    }
+
     if (action === 'update_description') {
       const { data: profile } = await adminClient
         .from('profiles')

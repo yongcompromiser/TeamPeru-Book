@@ -35,7 +35,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // 로그인하지 않은 사용자: 공개 경로 외 접근 차단
-  const publicPaths = ['/login', '/signup', '/auth', '/pending', '/api', '/_next'];
+  const publicPaths = ['/login', '/signup', '/auth', '/pending', '/invite', '/api', '/_next'];
   const isPublicPath = pathname === '/' || publicPaths.some((p) => pathname.startsWith(p));
 
   if (!user && !isPublicPath) {

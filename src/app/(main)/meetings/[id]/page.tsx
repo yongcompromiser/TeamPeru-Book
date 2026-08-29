@@ -28,6 +28,8 @@ import {
   ImagePlus,
   Pencil,
   Download,
+  Link2,
+  Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
@@ -41,6 +43,7 @@ interface Schedule {
   selected_book_id: string | null;
   status: string;
   is_revealed: boolean;
+  invite_public?: boolean;
   presenter?: { id: string; name: string; avatar_url?: string | null };
   selected_book?: { id: string; title: string; author: string; cover_url?: string; selection_reason?: string };
 }
@@ -124,6 +127,10 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
   // 탭 상태
   const [activeTab, setActiveTab] = useState<'info' | 'minutes'>('info');
+
+  // 공개 초대(게스트) 상태
+  const [isTogglingInvite, setIsTogglingInvite] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   // 회의록 상태
   const [minutesRaw, setMinutesRaw] = useState('');
@@ -542,6 +549,42 @@ export default function MeetingDetailPage({ params }: PageProps) {
     setIsSaving(false);
   };
 
+  const inviteUrl = typeof window !== 'undefined' && schedule
+    ? `${window.location.origin}/invite/${schedule.id}`
+    : '';
+
+  const handleToggleInvite = async () => {
+    if (!schedule || !isAdmin) return;
+    setIsTogglingInvite(true);
+    const next = !schedule.invite_public;
+    try {
+      const res = await fetch(`/api/meetings/${schedule.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_invite', invite_public: next }),
+      });
+      if (res.ok) {
+        setSchedule({ ...schedule, invite_public: next });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '설정 변경에 실패했습니다.');
+      }
+    } catch {
+      alert('설정 변경 중 오류가 발생했습니다.');
+    }
+    setIsTogglingInvite(false);
+  };
+
+  const handleCopyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    } catch {
+      alert(inviteUrl);
+    }
+  };
+
   const handleAddDiscussion = () => {
     setDiscussions([...discussions, '']);
   };
@@ -807,6 +850,58 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
       {/* 모임정보 탭 */}
       {activeTab === 'info' && <>
+      {/* 게스트 공개 초대 (관리자 전용) */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-amber-600" />
+              게스트 초대
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-gray-800">공개 초대 링크</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  켜면 로그인 없이 누구나 이 모임을 보고 참석 신청할 수 있어요.
+                </p>
+              </div>
+              <button
+                onClick={handleToggleInvite}
+                disabled={isTogglingInvite}
+                className={cn(
+                  'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-60',
+                  schedule.invite_public ? 'bg-amber-600' : 'bg-gray-300'
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                    schedule.invite_public ? 'translate-x-5' : 'translate-x-0.5'
+                  )}
+                />
+              </button>
+            </div>
+
+            {schedule.invite_public && (
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  readOnly
+                  value={inviteUrl}
+                  onFocus={(e) => e.target.select()}
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600"
+                />
+                <Button size="sm" variant="outline" onClick={handleCopyInvite}>
+                  {inviteCopied ? <Check className="w-4 h-4 mr-1 text-green-600" /> : <Copy className="w-4 h-4 mr-1" />}
+                  {inviteCopied ? '복사됨' : '복사'}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* 발제자의 선정 사유 (schedule.description) */}
       {(schedule.description || canReveal) && (
         <Card>
