@@ -2,38 +2,16 @@ import Link from 'next/link';
 import { BookOpen, Users, Calendar, MessageCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AmbientCanvas } from '@/components/features/ambient-canvas';
+import { LandingNav } from '@/components/features/landing-nav';
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#faf8f5]">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#faf8f5]/90 backdrop-blur-md border-b border-amber-100/50">
-        <div className="container mx-auto px-6 py-4">
-          <nav className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                팀 페루
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link href="/login">
-                <Button variant="ghost" className="text-gray-600">로그인</Button>
-              </Link>
-              <Link href="/signup">
-                <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
-                  시작하기
-                </Button>
-              </Link>
-            </div>
-          </nav>
-        </div>
-      </header>
+      {/* Header (히어로 위에선 투명, 스크롤 시 밝은 바) */}
+      <LandingNav />
 
       {/* Hero Section */}
-      <main className="pt-24">
+      <main>
         <section
           className="relative overflow-hidden"
           style={{ backgroundImage: 'linear-gradient(165deg, #15111f 0%, #241a37 48%, #2b1c30 100%)' }}
