@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-export type Memory = { text: string; name: string; book: string };
+export type Memory = { text: string; name: string; book: string; cover?: string };
 
 type Sticker = {
   id: number;
@@ -158,7 +158,7 @@ export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
             }}
           >
             <div
-              className="rounded-2xl px-5 py-4"
+              className="flex gap-3 rounded-2xl px-4 py-4"
               style={{
                 background: tone.bg,
                 boxShadow: isTop
@@ -167,14 +167,26 @@ export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
                 backdropFilter: 'blur(2px)',
               }}
             >
-              <div className="mb-2 h-1 w-8 rounded-full" style={{ background: tone.bar }} />
-              <p className="text-[15px] font-medium leading-snug" style={{ color: tone.ink }}>
-                “{s.q.text}”
-              </p>
-              <p className="mt-2 text-xs font-medium" style={{ color: tone.sub }}>
-                — {s.q.name}
-                {s.q.book ? ` · ${s.q.book}` : ''}
-              </p>
+              {s.q.cover ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={s.q.cover}
+                  alt=""
+                  className="h-[68px] w-[46px] flex-shrink-0 rounded-md object-cover"
+                  style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.35)' }}
+                  loading="lazy"
+                />
+              ) : null}
+              <div className="min-w-0">
+                <div className="mb-1.5 h-1 w-8 rounded-full" style={{ background: tone.bar }} />
+                <p className="text-[15px] font-medium leading-snug" style={{ color: tone.ink }}>
+                  “{s.q.text}”
+                </p>
+                <p className="mt-2 text-xs font-medium" style={{ color: tone.sub }}>
+                  — {s.q.name}
+                  {s.q.book ? ` · ${s.q.book}` : ''}
+                </p>
+              </div>
             </div>
           </div>
         );

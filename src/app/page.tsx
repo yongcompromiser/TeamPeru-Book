@@ -32,19 +32,28 @@ async function getMemories(): Promise<Memory[]> {
     const [{ data: profs }, booksRes] = await Promise.all([
       admin.from('profiles').select('id, name').in('id', userIds),
       bookIds.length
-        ? admin.from('books').select('id, title').in('id', bookIds)
-        : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+        ? admin.from('books').select('id, title, cover_url').in('id', bookIds)
+        : Promise.resolve({ data: [] as { id: string; title: string; cover_url: string | null }[] }),
     ]);
     const nameMap = new Map((profs || []).map((p: { id: string; name: string }) => [p.id, p.name]));
-    const bookMap = new Map((booksRes.data || []).map((b: { id: string; title: string }) => [b.id, b.title]));
+    const bookMap = new Map(
+      (booksRes.data || []).map((b: { id: string; title: string; cover_url: string | null }) => [
+        b.id,
+        { title: b.title, cover: b.cover_url || '' },
+      ])
+    );
     const schedBook = new Map(revealed.map((s) => [s.id, s.selected_book_id]));
 
     return subs
-      .map((s) => ({
-        text: (s.one_liner || '').trim(),
-        name: nameMap.get(s.user_id) || '익명',
-        book: bookMap.get(schedBook.get(s.schedule_id) as string) || '',
-      }))
+      .map((s) => {
+        const bk = bookMap.get(schedBook.get(s.schedule_id) as string);
+        return {
+          text: (s.one_liner || '').trim(),
+          name: nameMap.get(s.user_id) || '익명',
+          book: bk?.title || '',
+          cover: bk?.cover || '',
+        };
+      })
       .filter((m) => m.text.length > 0 && m.text.length <= 140);
   } catch {
     return [];
