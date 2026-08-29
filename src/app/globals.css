@@ -65,10 +65,16 @@ select {
   0%, 100% { transform: scale(1); opacity: 0.75; }
   50% { transform: scale(1.25); opacity: 1; }
 }
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(32px, -44px) scale(1.12); }
+  66% { transform: translate(-24px, 24px) scale(0.92); }
+}
 
 .animate-float { animation: floatY 3.5s ease-in-out infinite; }
 .animate-float-slow { animation: floatY2 5s ease-in-out infinite; }
 .animate-pulse-soft { animation: pulseSoft 2.4s ease-in-out infinite; }
+.animate-blob { animation: blob 14s ease-in-out infinite; }
 .animate-fade-up { animation: fadeUp 0.6s ease-out both; }
 .animate-gradient {
   background-size: 300% 300%;
@@ -89,6 +95,7 @@ select {
   .animate-float,
   .animate-float-slow,
   .animate-pulse-soft,
+  .animate-blob,
   .animate-fade-up,
   .animate-gradient,
   .shimmer-band::after {
