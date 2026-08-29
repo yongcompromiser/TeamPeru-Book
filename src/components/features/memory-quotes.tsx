@@ -53,14 +53,18 @@ export function MemoryQuotes({ quotes }: { quotes: Memory[] }) {
 
     const timers: ReturnType<typeof setTimeout>[] = [];
 
+    // 중앙(제목·버튼) 영역: x 32~68%, y 30~70% 는 피한다.
+    const inCenter = (x: number, y: number) => x > 32 && x < 68 && y > 30 && y < 70;
+
     const pickPos = (existing: Sticker[]) => {
-      // 기존 스티커와 최소 거리(MIN_GAP)를 확보하도록 여러 번 시도.
+      // 중앙을 피하고, 기존 스티커와 최소 거리(MIN_GAP)를 확보하도록 여러 번 시도.
       // 조건을 만족하는 첫 위치를 쓰고, 못 찾으면 가장 멀리 떨어진 위치를 사용.
       const gap2 = MIN_GAP * MIN_GAP;
-      let best = { x: 50, y: 50, d: -1 };
-      for (let t = 0; t < 40; t++) {
-        const x = 8 + Math.random() * 74; // 8%~82%
-        const y = 14 + Math.random() * 60; // 14%~74%
+      let best = { x: 8, y: 14, d: -1 };
+      for (let t = 0; t < 50; t++) {
+        const x = 6 + Math.random() * 78; // 6%~84%
+        const y = 12 + Math.random() * 66; // 12%~78%
+        if (inCenter(x, y)) continue; // 중앙 회피
         let dmin = Infinity;
         for (const s of existing) {
           const dx = s.x - x;
