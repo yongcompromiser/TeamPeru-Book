@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BookOpen, Users, Calendar, MessageCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AmbientCanvas } from '@/components/features/ambient-canvas';
 
 export default function Home() {
   return (
@@ -33,39 +34,31 @@ export default function Home() {
 
       {/* Hero Section */}
       <main className="pt-24">
-        <section className="relative overflow-hidden">
-          {/* 떠다니는 배경 블롭 */}
-          <div className="pointer-events-none absolute inset-0 -z-0" aria-hidden="true">
-            <div className="animate-blob absolute -top-10 left-[10%] h-72 w-72 rounded-full bg-blue-300/30 blur-3xl" />
-            <div className="animate-blob absolute top-20 right-[8%] h-80 w-80 rounded-full bg-purple-300/30 blur-3xl" style={{ animationDelay: '3s' }} />
-            <div className="animate-blob absolute bottom-0 left-[35%] h-72 w-72 rounded-full bg-indigo-300/25 blur-3xl" style={{ animationDelay: '6s' }} />
-          </div>
+        <section
+          className="relative overflow-hidden"
+          style={{ backgroundImage: 'linear-gradient(165deg, #15111f 0%, #241a37 48%, #2b1c30 100%)' }}
+        >
+          {/* 몰입형 입자 배경 (이야기 속으로 빨려들어가는 광원) */}
+          <AmbientCanvas className="absolute inset-0 h-full w-full" />
+          {/* 아래 밝은 섹션으로 자연스러운 전환 */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-[#faf8f5]" />
 
-          {/* 둥둥 떠다니는 책·반짝임 */}
-          <div className="pointer-events-none absolute inset-0 -z-0 select-none" aria-hidden="true">
-            <span className="animate-float absolute left-[12%] top-24 text-4xl opacity-70">📚</span>
-            <span className="animate-float-slow absolute right-[14%] top-16 text-3xl opacity-70">📖</span>
-            <span className="animate-pulse-soft absolute left-[22%] bottom-16 text-2xl">✨</span>
-            <span className="animate-float-slow absolute right-[24%] bottom-24 text-3xl opacity-60">📕</span>
-            <span className="animate-pulse-soft absolute right-[40%] top-10 text-xl" style={{ animationDelay: '1.2s' }}>✨</span>
-          </div>
-
-          <div className="container relative z-10 mx-auto px-6 py-20">
-            <div className="max-w-4xl mx-auto text-center">
-              <div className="animate-fade-up inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-medium mb-8">
-                <Sparkles className="w-4 h-4 animate-pulse-soft" />
+          <div className="container relative z-10 mx-auto px-6 py-28 sm:py-36">
+            <div className="mx-auto max-w-4xl text-center">
+              <div className="animate-fade-up mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-amber-100 backdrop-blur">
+                <Sparkles className="animate-pulse-soft h-4 w-4" />
                 팀 페루 독서토론
               </div>
 
-              <h1 className="animate-fade-up text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-8 leading-tight" style={{ animationDelay: '0.1s' }}>
+              <h1 className="animate-fade-up mb-8 text-5xl font-bold leading-tight text-white sm:text-6xl lg:text-7xl" style={{ animationDelay: '0.1s' }}>
                 책으로 연결되는
                 <br />
-                <span className="animate-gradient bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">
+                <span className="animate-gradient bg-gradient-to-r from-amber-300 via-rose-300 to-violet-300 bg-clip-text text-transparent">
                   우리의 이야기
                 </span>
               </h1>
 
-              <p className="animate-fade-up text-xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed" style={{ animationDelay: '0.2s' }}>
+              <p className="animate-fade-up mx-auto mb-12 max-w-2xl text-xl leading-relaxed text-white/75" style={{ animationDelay: '0.2s' }}>
                 같은 책을 읽고 다른 생각을 나누며 성장하는 팀 페루 독서토론.
                 <br />
                 일정 관리부터 토론 기록까지, 모든 것을 한 곳에서.
@@ -73,9 +66,9 @@ export default function Home() {
 
               <div className="animate-fade-up flex items-center justify-center gap-4" style={{ animationDelay: '0.3s' }}>
                 <Link href="/signup">
-                  <Button size="lg" className="group bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-lg px-8 py-6 rounded-xl shadow-lg shadow-blue-500/25 transition-transform hover:scale-105">
+                  <Button size="lg" className="group rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-8 py-6 text-lg shadow-lg shadow-indigo-900/40 transition-transform hover:scale-105 hover:from-blue-600 hover:to-indigo-700">
                     무료로 시작하기
-                    <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                    <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </Button>
                 </Link>
               </div>
