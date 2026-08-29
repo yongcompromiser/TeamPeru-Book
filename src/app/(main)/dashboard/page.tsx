@@ -110,13 +110,30 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
+      {/* Hero — 움직이는 그라데이션 + 둥둥 떠다니는 책 */}
+      <div
+        className="animate-gradient animate-fade-up relative overflow-hidden rounded-2xl p-8 sm:p-10 text-white shadow-sm"
+        style={{ backgroundImage: 'linear-gradient(120deg, #1e3a5f, #2d6a9f, #3b82f6, #2d6a9f, #1e3a5f)' }}
+      >
+        <span className="animate-float pointer-events-none absolute top-6 right-8 select-none text-4xl opacity-80">📚</span>
+        <span className="animate-float-slow pointer-events-none absolute bottom-5 right-24 select-none text-2xl opacity-70">✨</span>
+        <span className="animate-float-slow pointer-events-none absolute top-12 right-44 hidden select-none text-xl opacity-60 sm:block">📖</span>
+        <div className="relative">
+          <p className="text-sm font-medium text-white/80">팀 페루 독서토론</p>
+          <h1 className="mt-1 text-2xl font-bold sm:text-3xl">함께 읽고, 나누는 즐거움 📖</h1>
+          <p className="mt-2 text-sm text-white/85 sm:text-base">
+            {nextSchedule
+              ? `다음 모임 · ${formatDate(nextSchedule.meeting_date, { month: 'long', day: 'numeric', weekday: 'long' })}`
+              : '다음 모임을 함께 준비해봐요'}
+          </p>
+        </div>
+      </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Next Meeting */}
-        <Card className="overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
-            <div className="flex items-center gap-2 text-white">
+        <Card className="animate-fade-up overflow-hidden" style={{ animationDelay: '0.08s' }}>
+          <div className="shimmer-band bg-gradient-to-r from-blue-500 to-blue-600 p-4">
+            <div className="relative flex items-center gap-2 text-white">
               <Calendar className="w-5 h-5" />
               <span className="font-medium">다가오는 모임</span>
             </div>
@@ -210,11 +227,13 @@ export default async function DashboardPage() {
         </Card>
 
         {/* Featured Book / 후보 투표 */}
-        <BookVoteCard
-          scheduleId={nextSchedule?.id || null}
-          featuredBook={featuredBook}
-          featuredPresenter={featuredPresenter}
-        />
+        <div className="animate-fade-up" style={{ animationDelay: '0.18s' }}>
+          <BookVoteCard
+            scheduleId={nextSchedule?.id || null}
+            featuredBook={featuredBook}
+            featuredPresenter={featuredPresenter}
+          />
+        </div>
       </div>
     </div>
   );
