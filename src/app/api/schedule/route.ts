@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { notifyMembers } from '@/lib/kakao-notify';
@@ -172,6 +173,55 @@ export async function POST(request: Request) {
         await notifyMembers(text, `${getBaseUrl(request)}/schedule`);
       } catch (e) {
         console.error('일정 확정 알림 실패:', e);
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'cancel') {
+      // 일정 취소 = 해당 일정과 모임 관련 데이터를 완전 삭제.
+      // 클라이언트 직접 삭제는 RLS로 조용히 실패할 수 있어(0행 삭제·에러없음),
+      // service role(admin) 로 확실하게 지운다. 지우면 모임 탭에서도 자동으로 사라진다.
+      const { scheduleId } = data;
+      if (!scheduleId) {
+        return NextResponse.json({ error: 'scheduleId required' }, { status: 400 });
+      }
+
+      // 관리자만 취소 가능
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profile?.role !== 'admin') {
+        return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 });
+      }
+
+      const admin = createAdminClient();
+
+      // 이 일정을 참조하는 자식 데이터 정리(존재하지 않는 테이블은 무시).
+      const childTables = [
+        'book_votes',
+        'schedule_book_candidates',
+        'meeting_submissions',
+        'meeting_minutes',
+        'meeting_comments',
+        'attendances',
+        'discussions',
+        'recaps',
+      ];
+      for (const t of childTables) {
+        try {
+          await admin.from(t).delete().eq('schedule_id', scheduleId);
+        } catch {
+          // 테이블이 없거나 컬럼이 없으면 건너뜀
+        }
+      }
+
+      // 일정 삭제
+      const { error } = await admin.from('schedules').delete().eq('id', scheduleId);
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
       }
 
       return NextResponse.json({ success: true });

@@ -598,33 +598,23 @@ export default function SchedulePage() {
   const handleCancelSchedule = async () => {
     if (!selectedSchedule || !isAdmin) return;
 
-    if (!confirm('정말 이 일정을 취소하시겠습니까?')) return;
+    if (!confirm('정말 이 일정을 취소하시겠습니까? 모임 탭에서도 함께 삭제됩니다.')) return;
 
-    // 관련 book_votes 삭제
-    await supabase
-      .from('book_votes')
-      .delete()
-      .eq('schedule_id', selectedSchedule.id);
+    // 취소는 서버(admin, RLS 우회)에서 처리 → 일정과 모임 데이터를 확실히 삭제
+    const res = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel', scheduleId: selectedSchedule.id }),
+    });
 
-    // 관련 schedule_book_candidates 삭제
-    await supabase
-      .from('schedule_book_candidates')
-      .delete()
-      .eq('schedule_id', selectedSchedule.id);
-
-    // schedule 삭제
-    const { error } = await supabase
-      .from('schedules')
-      .delete()
-      .eq('id', selectedSchedule.id);
-
-    if (!error) {
+    if (res.ok) {
       alert('일정이 취소되었습니다.');
       setSelectedSchedule(null);
       setSelectedDate(null);
       await fetchSchedules();
     } else {
-      alert('일정 취소에 실패했습니다.');
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || '일정 취소에 실패했습니다.');
     }
   };
 
