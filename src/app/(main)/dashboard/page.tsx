@@ -113,11 +113,11 @@ export default async function DashboardPage() {
       {/* Hero — 움직이는 그라데이션 + 둥둥 떠다니는 책 */}
       <div
         className="animate-gradient animate-fade-up relative overflow-hidden rounded-2xl p-8 sm:p-10 text-white shadow-sm"
-        style={{ backgroundImage: 'linear-gradient(120deg, #1e3a5f, #2d6a9f, #3b82f6, #2d6a9f, #1e3a5f)' }}
+        style={{ backgroundImage: 'linear-gradient(120deg, #1e3a5f, #6d28d9, #2563eb, #0ea5e9, #6d28d9, #1e3a5f)' }}
       >
-        <span className="animate-float pointer-events-none absolute top-6 right-8 select-none text-4xl opacity-80">📚</span>
-        <span className="animate-float-slow pointer-events-none absolute bottom-5 right-24 select-none text-2xl opacity-70">✨</span>
-        <span className="animate-float-slow pointer-events-none absolute top-12 right-44 hidden select-none text-xl opacity-60 sm:block">📖</span>
+        <span className="animate-float pointer-events-none absolute top-6 right-8 select-none text-4xl">📚</span>
+        <span className="animate-pulse-soft pointer-events-none absolute bottom-6 right-24 select-none text-2xl">✨</span>
+        <span className="animate-float-slow pointer-events-none absolute top-12 right-44 hidden select-none text-2xl opacity-80 sm:block">📖</span>
         <div className="relative">
           <p className="text-sm font-medium text-white/80">팀 페루 독서토론</p>
           <h1 className="mt-1 text-2xl font-bold sm:text-3xl">함께 읽고, 나누는 즐거움 📖</h1>
