@@ -97,9 +97,12 @@ export function AmbientCanvas({ className }: { className?: string }) {
       ps = Array.from({ length: count }, () => spawn(false));
     }
 
-    function drawGlow() {
-      const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, Math.max(w, h) * 0.55);
-      g.addColorStop(0, 'rgba(242, 194, 124, 0.18)');
+    function drawGlow(t: number) {
+      // 광원이 천천히 숨쉬듯 밝기·크기가 미세하게 오르내림
+      const breathe = 0.5 + 0.5 * Math.sin(t * 0.0006);
+      const radius = Math.max(w, h) * (0.5 + 0.08 * breathe);
+      const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, radius);
+      g.addColorStop(0, `rgba(242, 194, 124, ${0.14 + 0.08 * breathe})`);
       g.addColorStop(0.5, 'rgba(150, 130, 205, 0.05)');
       g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g;
@@ -122,7 +125,7 @@ export function AmbientCanvas({ className }: { className?: string }) {
       const k = dt / 16.67;
 
       ctx.clearRect(0, 0, w, h);
-      drawGlow();
+      drawGlow(t);
       mouse.ax += (mouse.x - mouse.ax) * 0.04;
       mouse.ay += (mouse.y - mouse.ay) * 0.04;
 
@@ -148,7 +151,7 @@ export function AmbientCanvas({ className }: { className?: string }) {
 
     if (prefersReduced) {
       // 정지 프레임 한 장
-      drawGlow();
+      drawGlow(0);
       ctx.globalCompositeOperation = 'lighter';
       for (const p of ps) drawParticle(p, 0);
       ctx.globalAlpha = 1;

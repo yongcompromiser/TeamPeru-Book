@@ -6,8 +6,9 @@ import { LandingNav } from '@/components/features/landing-nav';
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen text-white" style={{ backgroundColor: '#15111f' }}>
-      {/* 화면 고정 몰입형 배경 (스크롤 내내 유지) */}
+    <div className="relative min-h-screen text-white">
+      {/* 화면 고정 몰입형 배경 (스크롤 내내 유지).
+          바깥 div 에 배경색을 주면 이 음수 z 레이어를 덮으므로, 다크 배경은 여기서만 칠한다. */}
       <div
         className="pointer-events-none fixed inset-0 -z-10"
         style={{ backgroundImage: 'linear-gradient(165deg, #15111f 0%, #241a37 50%, #2b1c30 100%)' }}
