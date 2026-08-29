@@ -6,22 +6,23 @@ import { LandingNav } from '@/components/features/landing-nav';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#faf8f5]">
-      {/* Header (히어로 위에선 투명, 스크롤 시 밝은 바) */}
+    <div className="relative min-h-screen text-white" style={{ backgroundColor: '#15111f' }}>
+      {/* 화면 고정 몰입형 배경 (스크롤 내내 유지) */}
+      <div
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{ backgroundImage: 'linear-gradient(165deg, #15111f 0%, #241a37 50%, #2b1c30 100%)' }}
+        aria-hidden="true"
+      >
+        <AmbientCanvas className="absolute inset-0 h-full w-full" />
+      </div>
+
+      {/* Header (전체 다크 위에서 투명, 스크롤 시 어두운 바) */}
       <LandingNav />
 
-      {/* Hero Section */}
       <main>
-        <section
-          className="relative overflow-hidden"
-          style={{ backgroundImage: 'linear-gradient(165deg, #15111f 0%, #241a37 48%, #2b1c30 100%)' }}
-        >
-          {/* 몰입형 입자 배경 (이야기 속으로 빨려들어가는 광원) */}
-          <AmbientCanvas className="absolute inset-0 h-full w-full" />
-          {/* 아래 밝은 섹션으로 자연스러운 전환 */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-[#faf8f5]" />
-
-          <div className="container relative z-10 mx-auto px-6 py-28 sm:py-36">
+        {/* Hero Section */}
+        <section className="relative">
+          <div className="container relative z-10 mx-auto px-6 py-32 sm:py-40">
             <div className="mx-auto max-w-4xl text-center">
               <div className="animate-fade-up mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-amber-100 backdrop-blur">
                 <Sparkles className="animate-pulse-soft h-4 w-4" />
@@ -55,13 +56,13 @@ export default function Home() {
         </section>
 
         {/* Features */}
-        <section className="bg-gradient-to-b from-amber-50/50 to-[#faf8f5] py-24">
+        <section className="relative py-24">
           <div className="container mx-auto px-6">
             <div className="text-center mb-16">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              <h2 className="text-3xl font-bold text-white mb-4">
                 독서모임을 더 즐겁게
               </h2>
-              <p className="text-gray-600">
+              <p className="text-white/60">
                 팀 페루가 제공하는 다양한 기능들을 만나보세요
               </p>
             </div>
@@ -100,10 +101,10 @@ export default function Home() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-24">
+        <section className="relative py-24">
           <div className="container mx-auto px-6">
             <div
-              className="animate-gradient max-w-4xl mx-auto rounded-3xl p-12 text-center text-white relative overflow-hidden"
+              className="animate-gradient max-w-4xl mx-auto rounded-3xl p-12 text-center text-white relative overflow-hidden border border-white/10 shadow-2xl shadow-black/40"
               style={{ backgroundImage: 'linear-gradient(120deg, #2563eb, #6d28d9, #4f46e5, #2563eb)' }}
             >
               <div className="absolute inset-0 opacity-20">
@@ -129,9 +130,9 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-amber-100/50 py-8">
+      <footer className="relative border-t border-white/10 py-8">
         <div className="container mx-auto px-6">
-          <p className="text-center text-gray-500 text-sm">
+          <p className="text-center text-white/45 text-sm">
             © 2025 팀 페루 독서토론. All rights reserved.
           </p>
         </div>
@@ -162,14 +163,14 @@ function FeatureCard({
 
   return (
     <div
-      className="animate-fade-up bg-[#fffdf9] rounded-2xl p-6 shadow-sm border border-amber-100/50 hover:shadow-lg hover:border-amber-200/50 hover:-translate-y-1 transition-all duration-300 group"
+      className="animate-fade-up group rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/10"
       style={{ animationDelay: `${delay}s` }}
     >
       <div className={`w-14 h-14 bg-gradient-to-br ${colorMap[color]} rounded-xl flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform`}>
         <Icon className="w-7 h-7 text-white" />
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-600 text-sm leading-relaxed">{description}</p>
+      <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+      <p className="text-white/60 text-sm leading-relaxed">{description}</p>
     </div>
   );
 }
