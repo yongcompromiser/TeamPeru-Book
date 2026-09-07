@@ -20,6 +20,7 @@ type ColumnKey =
   | 'presenter_count'
   | 'discussion_count'
   | 'avg_rating'
+  | 'rating_bias'
   | 'books_registered'
   | 'board_post_count'
   | 'comment_count'
@@ -84,6 +85,23 @@ const columns: Column[] = [
     hint: '모임에서 매긴 별점의 평균',
     render: (m) => (m.avg_rating === null ? '-' : m.avg_rating.toFixed(1)),
     value: (m) => m.avg_rating ?? -1,
+  },
+  {
+    key: 'rating_bias',
+    label: '평점 성향',
+    hint: '모임 전체 평균 대비. 양수면 후한 편, 음수면 짠 편',
+    render: (m) => {
+      if (m.rating_bias === null) return '-';
+      if (Math.abs(m.rating_bias) < 0.05) return <span className="text-gray-400">평균</span>;
+      const up = m.rating_bias > 0;
+      return (
+        <span className={up ? 'text-rose-600' : 'text-sky-600'}>
+          {up ? '+' : ''}
+          {m.rating_bias.toFixed(1)}
+        </span>
+      );
+    },
+    value: (m) => m.rating_bias ?? -99,
   },
   {
     key: 'books_registered',

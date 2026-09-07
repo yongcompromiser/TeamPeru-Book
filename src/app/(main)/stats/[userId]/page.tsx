@@ -23,9 +23,12 @@ import {
   ThumbsUp,
   Tag,
   Clock,
+  Heart,
+  Activity,
 } from 'lucide-react';
 import { formatLateMinutes } from '@/lib/attendance';
 import { CategoryDistribution } from '@/components/features/category-distribution';
+import { RadarChart } from '@/components/features/radar-chart';
 import type { MemberDetail, ReadBook } from '@/lib/stats';
 
 function StatTile({
@@ -221,9 +224,29 @@ export default function MemberStatsPage() {
     );
   }
 
-  const { summary: s, yearly, rating_distribution, categories, books, presented } = detail;
+  const {
+    summary: s,
+    yearly,
+    rating_distribution,
+    categories,
+    books,
+    presented,
+    affinities,
+    category_preferences,
+    reactions,
+    radar,
+  } = detail;
   const maxDist = Math.max(1, ...rating_distribution.map((d) => d.count));
   const comment = ratingComment(s.avg_rating);
+
+  // 인생책 / 최악의 책 — 본인이 준 별점 기준
+  const ratedBooks = books.filter((b) => typeof b.rating === 'number' && b.rating > 0);
+  const bestBook = ratedBooks.length > 0
+    ? ratedBooks.reduce((a, b) => (b.rating! > a.rating! ? b : a))
+    : null;
+  const worstBook = ratedBooks.length > 1
+    ? ratedBooks.reduce((a, b) => (b.rating! < a.rating! ? b : a))
+    : null;
 
   return (
     <div className="space-y-6">
@@ -322,6 +345,202 @@ export default function MemberStatsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* 인생책 / 최악의 책 */}
+      {bestBook && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[
+            { label: '인생책', book: bestBook, tone: 'border-amber-200 bg-amber-50/60' },
+            ...(worstBook && worstBook.schedule_id !== bestBook.schedule_id
+              ? [{ label: '가장 아쉬웠던 책', book: worstBook, tone: 'border-gray-200 bg-gray-50' }]
+              : []),
+          ].map(({ label, book, tone }) => (
+            <Card key={label} className={cn('border', tone)}>
+              <CardContent className="flex gap-4">
+                <Link href={`/meetings/${book.schedule_id}`} className="shrink-0">
+                  <div className="w-14 aspect-[2/3] rounded-md overflow-hidden bg-white border border-gray-200">
+                    {book.cover_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={book.cover_url}
+                        alt={book.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center p-1">
+                        <span className="text-[9px] text-gray-500 text-center line-clamp-4">
+                          {book.title}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </Link>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-amber-700">{label}</p>
+                  <Link
+                    href={`/meetings/${book.schedule_id}`}
+                    className="font-semibold text-gray-900 hover:text-amber-700 block truncate"
+                  >
+                    {book.title}
+                  </Link>
+                  {book.rating && (
+                    <div className="mt-1">
+                      <Stars rating={book.rating} />
+                    </div>
+                  )}
+                  {book.one_liner && (
+                    <p className="text-sm text-gray-600 mt-2 line-clamp-3">“{book.one_liner}”</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* 취향 궁합 */}
+      {affinities.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Heart className="w-4 h-4 text-rose-500" />
+              취향 궁합
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {affinities.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/stats/${a.id}`}
+                  className="flex items-center gap-3 group"
+                >
+                  <Avatar src={a.avatar_url} name={a.name} size="sm" />
+                  <span className="text-sm font-medium text-gray-900 w-16 shrink-0 group-hover:text-amber-700">
+                    {a.name}
+                  </span>
+                  <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-rose-400 rounded-full transition-all duration-700"
+                      style={{ width: `${a.score}%` }}
+                    />
+                  </div>
+                  <span className="text-sm text-gray-700 tabular-nums w-10 text-right shrink-0">
+                    {a.score}%
+                  </span>
+                  <span className="text-[11px] text-gray-400 w-12 text-right shrink-0">
+                    {a.common}권
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              같은 책에 준 별점이 얼마나 비슷한지입니다. 함께 평가한 책이 3권 이상일 때만 나옵니다.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 종합 성향 (레이더) */}
+      {radar.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="w-4 h-4 text-gray-500" />
+              종합 성향
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RadarChart axes={radar} />
+            <p className="text-xs text-gray-400 mt-3">
+              축마다 단위가 달라 절대 비교가 어렵습니다. 멤버 중 최고값을 100으로 둔 상대값이고,
+              오른쪽 숫자가 실제 값입니다.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 분야별 선호도 */}
+      {category_preferences.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-500" />
+              분야별 선호도
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {category_preferences.map((c) => {
+                const diff = c.group_avg === null ? null : Math.round((c.my_avg - c.group_avg) * 10) / 10;
+                return (
+                  <div key={c.category} className="flex items-center gap-3 text-sm">
+                    <span className="text-gray-700 w-20 shrink-0 truncate">{c.category}</span>
+                    <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden relative">
+                      <div
+                        className="h-full bg-amber-400 rounded-full transition-all duration-700"
+                        style={{ width: `${(c.my_avg / 5) * 100}%` }}
+                      />
+                      {c.group_avg !== null && (
+                        <div
+                          className="absolute top-0 h-full w-0.5 bg-gray-500"
+                          style={{ left: `${(c.group_avg / 5) * 100}%` }}
+                          title={`모임 평균 ${c.group_avg}`}
+                        />
+                      )}
+                    </div>
+                    <span className="tabular-nums text-gray-900 w-8 text-right shrink-0">
+                      {c.my_avg.toFixed(1)}
+                    </span>
+                    {diff !== null && Math.abs(diff) >= 0.1 && (
+                      <span
+                        className={cn(
+                          'text-xs w-10 text-right shrink-0',
+                          diff > 0 ? 'text-rose-600' : 'text-sky-600'
+                        )}
+                      >
+                        {diff > 0 ? '+' : ''}
+                        {diff.toFixed(1)}
+                      </span>
+                    )}
+                    <span className="text-[11px] text-gray-400 w-8 text-right shrink-0">
+                      {c.count}권
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              막대는 내 평균 별점, 회색 세로선은 그 분야의 모임 평균입니다.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 내 발제가 받은 반응 */}
+      {reactions.total > 0 && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-600">내 발제문에 달린 댓글</span>
+              <span className="text-lg font-bold text-gray-900">{reactions.total}</span>
+            </div>
+            {reactions.top && (
+              <p className="text-sm text-gray-500">
+                가장 반응이 좋았던 책 —{' '}
+                <Link
+                  href={`/meetings/${reactions.top.schedule_id}`}
+                  className="text-amber-700 hover:underline font-medium"
+                >
+                  {reactions.top.title}
+                </Link>{' '}
+                ({reactions.top.count}개)
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 이 멤버가 읽은 분야 */}
       {categories.length > 0 && (

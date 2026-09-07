@@ -40,7 +40,8 @@ export async function GET(
       return NextResponse.json({ error: '해당 멤버를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    return NextResponse.json({ detail: buildMemberDetail(data, summary) });
+    // 레이더·취향 궁합은 다른 멤버와의 비교가 필요해 전체 목록을 함께 넘긴다
+    return NextResponse.json({ detail: buildMemberDetail(data, summary, members) });
   } catch (error) {
     console.error('Stats detail GET error:', error);
     return NextResponse.json({ error: '통계를 불러오지 못했습니다.' }, { status: 500 });

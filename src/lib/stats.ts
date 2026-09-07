@@ -37,6 +37,8 @@ export interface MemberSummary {
   one_liner_count: number;
   avg_rating: number | null;
   rating_count: number;
+  // 모임 전체 평균 대비 편차. 양수면 후한 편, 음수면 짠 편.
+  rating_bias: number | null;
 
   // 기여
   books_registered: number;
@@ -99,6 +101,7 @@ export interface StatsData {
   books: Row[];
   boardPosts: Row[];
   comments: Row[]; // 4개 댓글 테이블 통합 (user_id 만 사용)
+  submissionComments: Row[]; // 발제문에 달린 댓글 (submission_id 로 연결)
 }
 
 // 정의가 마이그레이션에 없는 테이블이 있어(대시보드에서 수동 생성됨) 조회가 실패해도
@@ -148,13 +151,17 @@ export async function loadStatsData(): Promise<StatsData> {
     ),
     safeSelect(admin, 'attendances', 'schedule_id, user_id, status'),
     safeSelect(admin, 'meeting_arrivals', 'schedule_id, user_id, status, arrived_at'),
-    safeSelect(admin, 'meeting_submissions', 'schedule_id, user_id, discussion, one_liner, rating'),
+    safeSelect(
+      admin,
+      'meeting_submissions',
+      'id, schedule_id, user_id, discussion, one_liner, rating'
+    ),
     safeSelect(admin, 'books', 'id, title, author, cover_url, category, created_by, status'),
     safeSelect(admin, 'board_posts', 'user_id, created_at'),
     safeSelect(admin, 'comments', 'user_id'),
     safeSelect(admin, 'meeting_comments', 'user_id'),
     safeSelect(admin, 'board_comments', 'user_id'),
-    safeSelect(admin, 'submission_comments', 'user_id'),
+    safeSelect(admin, 'submission_comments', 'user_id, submission_id'),
   ]);
 
   const now = Date.now();
@@ -172,6 +179,7 @@ export async function loadStatsData(): Promise<StatsData> {
     books,
     boardPosts,
     comments: [...comments, ...meetingComments, ...boardComments, ...submissionComments],
+    submissionComments,
   };
 }
 
@@ -343,6 +351,17 @@ export function buildMemberSummaries(data: StatsData): {
     activeSince.set(id, since);
   }
 
+  // 모임 전체 평균 별점. 개인의 '후한/짠' 성향을 재는 기준선이 된다.
+  let overallSum = 0;
+  let overallCount = 0;
+  for (const [uid, sum] of ratingSums) {
+    // 통계 대상 역할(admin/member)의 별점만 기준선에 넣는다
+    if (!targets.some((p) => (p.id as string) === uid)) continue;
+    overallSum += sum;
+    overallCount += ratingCounts.get(uid) ?? 0;
+  }
+  const overallAvgRating = overallCount > 0 ? overallSum / overallCount : null;
+
   const members: MemberSummary[] = targets.map((p) => {
     const id = p.id as string;
     const since = activeSince.get(id) ?? new Date(p.created_at as string).getTime();
@@ -382,6 +401,10 @@ export function buildMemberSummaries(data: StatsData): {
       avg_rating:
         ratingCount > 0 ? Math.round(((ratingSums.get(id) ?? 0) / ratingCount) * 10) / 10 : null,
       rating_count: ratingCount,
+      rating_bias:
+        ratingCount > 0 && overallAvgRating !== null
+          ? Math.round(((ratingSums.get(id) ?? 0) / ratingCount - overallAvgRating) * 10) / 10
+          : null,
 
       books_registered,
       books_selected: booksSelected.get(id) ?? 0,
@@ -444,6 +467,34 @@ export interface ReadBook {
   discussions: string[];
 }
 
+// 같은 책에 준 별점이 얼마나 비슷한지
+export interface Affinity {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  common: number; // 함께 평가한 책 수
+  score: number; // 0~100
+}
+
+// 분야별로 내 평균 별점과 모임 평균을 나란히
+export interface CategoryPreference {
+  category: string;
+  count: number;
+  my_avg: number;
+  group_avg: number | null;
+}
+
+export interface SubmissionReaction {
+  total: number; // 내 발제문에 달린 댓글 총 수
+  top: { schedule_id: string; title: string; count: number } | null;
+}
+
+export interface RadarAxis {
+  axis: string;
+  raw: number;
+  value: number; // 0~100, 멤버 중 최고값 대비
+}
+
 export interface MemberDetail {
   summary: MemberSummary;
   yearly: YearlyPoint[];
@@ -451,6 +502,10 @@ export interface MemberDetail {
   categories: CategorySlice[]; // 이 멤버가 참여한 모임의 책 분야 분포
   books: ReadBook[];
   presented: PresentedMeeting[];
+  affinities: Affinity[];
+  category_preferences: CategoryPreference[];
+  reactions: SubmissionReaction;
+  radar: RadarAxis[];
 }
 
 // 사이트에서 확정한 모임은 제목이 일괄 '정기 모임'이라 목록에서 구분이 안 된다.
@@ -468,7 +523,25 @@ function yearKey(iso: string): string {
   return String(new Date(iso).getFullYear());
 }
 
-export function buildMemberDetail(data: StatsData, summary: MemberSummary): MemberDetail {
+// 함께 평가한 책이 이보다 적으면 취향 비교가 의미 없다.
+const MIN_COMMON_BOOKS = 3;
+
+/**
+ * 두 사람이 같은 책에 준 별점이 얼마나 비슷한지 0~100 으로.
+ * 평균 절대차를 쓴다(별점 폭이 1~5 이므로 최대 차이는 4).
+ * 상관계수 대신 절대차를 쓰는 이유: 표본이 십여 개라 상관계수는 불안정하고,
+ * '둘 다 비슷한 점수를 줬는가'가 우리가 알고 싶은 것이기 때문이다.
+ */
+function affinityScore(pairs: [number, number][]): number {
+  const diff = pairs.reduce((sum, [a, b]) => sum + Math.abs(a - b), 0) / pairs.length;
+  return Math.round((1 - diff / 4) * 100);
+}
+
+export function buildMemberDetail(
+  data: StatsData,
+  summary: MemberSummary,
+  allMembers: MemberSummary[] = []
+): MemberDetail {
   const userId = summary.id;
   const since = new Date(summary.active_since).getTime();
 
@@ -564,10 +637,131 @@ export function buildMemberDetail(data: StatsData, summary: MemberSummary): Memb
       };
     });
 
+  // ── 취향 궁합 ──
+  // 같은 모임에 대해 서로 별점을 남긴 경우만 비교한다.
+  const myRatingBySchedule = new Map<string, number>();
+  for (const s of data.submissions) {
+    if (s.user_id !== userId) continue;
+    const r = s.rating as number | null;
+    if (typeof r === 'number' && r > 0) myRatingBySchedule.set(s.schedule_id as string, r);
+  }
+
+  const affinities: Affinity[] = [];
+  for (const other of allMembers) {
+    if (other.id === userId) continue;
+    const pairs: [number, number][] = [];
+    for (const s of data.submissions) {
+      if (s.user_id !== other.id) continue;
+      const theirs = s.rating as number | null;
+      const mine = myRatingBySchedule.get(s.schedule_id as string);
+      if (typeof theirs === 'number' && theirs > 0 && mine !== undefined) {
+        pairs.push([mine, theirs]);
+      }
+    }
+    if (pairs.length < MIN_COMMON_BOOKS) continue;
+    affinities.push({
+      id: other.id,
+      name: other.name,
+      avatar_url: other.avatar_url,
+      common: pairs.length,
+      score: affinityScore(pairs),
+    });
+  }
+  affinities.sort((a, b) => b.score - a.score);
+
+  // ── 분야별 선호도 ──
+  const scheduleBook = new Map(
+    data.pastSchedules.map((s) => [s.id as string, s.selected_book_id as string | null])
+  );
+  const myByCategory = new Map<string, number[]>();
+  const groupByCategory = new Map<string, number[]>();
+
+  for (const s of data.submissions) {
+    const r = s.rating as number | null;
+    if (typeof r !== 'number' || r <= 0) continue;
+    const bookId = scheduleBook.get(s.schedule_id as string);
+    if (!bookId) continue;
+    const category = (bookMap.get(bookId)?.category as string | null) ?? null;
+    if (!category) continue;
+
+    const groupList = groupByCategory.get(category) ?? [];
+    groupList.push(r);
+    groupByCategory.set(category, groupList);
+
+    if (s.user_id === userId) {
+      const myList = myByCategory.get(category) ?? [];
+      myList.push(r);
+      myByCategory.set(category, myList);
+    }
+  }
+
+  const avg = (xs: number[]) => Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10;
+  const category_preferences: CategoryPreference[] = [...myByCategory.entries()]
+    .map(([category, mine]) => {
+      const group = groupByCategory.get(category);
+      return {
+        category,
+        count: mine.length,
+        my_avg: avg(mine),
+        group_avg: group && group.length > 0 ? avg(group) : null,
+      };
+    })
+    .sort((a, b) => b.my_avg - a.my_avg);
+
+  // ── 내 발제가 받은 반응 ──
+  const mySubmissionIds = new Map<string, string>(); // submission id → schedule id
+  for (const s of data.submissions) {
+    if (s.user_id === userId && s.id) mySubmissionIds.set(s.id as string, s.schedule_id as string);
+  }
+  const perSchedule = new Map<string, number>();
+  let totalReactions = 0;
+  for (const c of data.submissionComments) {
+    const scheduleId = mySubmissionIds.get(c.submission_id as string);
+    if (!scheduleId) continue;
+    totalReactions += 1;
+    perSchedule.set(scheduleId, (perSchedule.get(scheduleId) ?? 0) + 1);
+  }
+  let topReaction: SubmissionReaction['top'] = null;
+  for (const [scheduleId, count] of perSchedule) {
+    if (topReaction && count <= topReaction.count) continue;
+    const s = data.pastSchedules.find((x) => x.id === scheduleId);
+    const bookId = s ? (s.selected_book_id as string | null) : null;
+    const title =
+      (bookId ? (bookMap.get(bookId)?.title as string | undefined) : undefined) ??
+      (s?.title as string | undefined) ??
+      '';
+    topReaction = { schedule_id: scheduleId, title, count };
+  }
+
+  // ── 레이더 ──
+  // 축마다 단위가 달라 절대값으로는 비교가 안 된다. 멤버 중 최고값을 100 으로 두고
+  // 상대 위치만 보여준다(그래서 라벨에 '멤버 중 최고 대비'를 명시한다).
+  const pool = allMembers.length > 0 ? allMembers : [summary];
+  const axisDefs: { axis: string; get: (m: MemberSummary) => number }[] = [
+    { axis: '참석', get: (m) => m.participated },
+    { axis: '발제', get: (m) => m.discussion_count },
+    { axis: '평점', get: (m) => m.rating_count },
+    { axis: '기여', get: (m) => m.books_registered + m.board_post_count + m.comment_count },
+    {
+      axis: '성실',
+      // 지각·불참이 적을수록 높다
+      get: (m) => Math.max(0, m.participated - m.late_count - m.absent_count),
+    },
+  ];
+  const radar: RadarAxis[] = axisDefs.map(({ axis, get }) => {
+    const max = Math.max(...pool.map(get), 0);
+    const raw = get(summary);
+    return { axis, raw, value: max > 0 ? Math.round((raw / max) * 100) : 0 };
+  });
+
   return {
     summary,
     yearly,
     rating_distribution,
+    affinities,
+    category_preferences,
+    reactions: { total: totalReactions, top: topReaction },
+    radar,
     categories: buildCategoryDistribution(books.map((b) => b.category)),
     books,
     presented,
