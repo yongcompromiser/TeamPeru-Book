@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, BookOpen, Settings, Tag } from 'lucide-react';
+import { Plus, BookOpen, Settings, Tag, Sparkles } from 'lucide-react';
 import { BookStatus, BOOK_STATUS_LABELS, BOOK_STATUS_COLORS } from '@/types';
 import { BOOK_CATEGORIES } from '@/lib/book-category';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,7 @@ export default function BooksPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [filter, setFilter] = useState<BookStatus | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [isClassifying, setIsClassifying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
 
@@ -82,6 +83,62 @@ export default function BooksPage() {
       ));
     }
     setEditingBookId(null);
+  };
+
+  // 기존에 등록된 책들은 분야가 비어 있다. 제목/저자/설명으로 한 번에 채운다.
+  // 무엇이 바뀔지 먼저 보여주고 확인을 받은 뒤에 저장한다.
+  const handleAutoClassify = async () => {
+    setIsClassifying(true);
+    try {
+      const previewRes = await fetch('/api/books/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: true }),
+      });
+      const preview = await previewRes.json();
+
+      if (!previewRes.ok) {
+        alert(preview.error || '자동 분류에 실패했습니다.');
+        return;
+      }
+      if (preview.planned.length === 0) {
+        alert(
+          `분야를 추측할 수 있는 책이 없습니다.\n미분류 ${preview.total}권은 정보가 부족해 직접 지정해주세요.`
+        );
+        return;
+      }
+
+      const sample = preview.planned
+        .slice(0, 15)
+        .map((p: { title: string; category: string }) => `· ${p.title} → ${p.category}`)
+        .join('\n');
+      const more =
+        preview.planned.length > 15 ? `\n... 외 ${preview.planned.length - 15}권` : '';
+
+      const ok = confirm(
+        `미분류 ${preview.total}권 중 ${preview.planned.length}권의 분야를 아래와 같이 지정합니다.\n` +
+          `(${preview.skipped.length}권은 근거가 부족해 그대로 둡니다)\n\n${sample}${more}\n\n` +
+          `적용할까요? 틀린 항목은 나중에 책 상세에서 바꿀 수 있습니다.`
+      );
+      if (!ok) return;
+
+      const res = await fetch('/api/books/classify', { method: 'POST' });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(result.error || '자동 분류에 실패했습니다.');
+        return;
+      }
+
+      alert(
+        `${result.updated}권의 분야를 지정했습니다.\n` +
+          `${result.skippedCount}권은 근거가 부족해 미분류로 남겨뒀습니다.`
+      );
+      await fetchBooks();
+    } catch {
+      alert('자동 분류에 실패했습니다.');
+    } finally {
+      setIsClassifying(false);
+    }
   };
 
   const filteredBooks = books.filter((book) => {
@@ -214,6 +271,21 @@ export default function BooksPage() {
               분야 없음
               <span className="ml-1.5 opacity-70">{uncategorizedCount}</span>
             </button>
+          )}
+
+          {/* 예전에 등록돼 분야가 비어 있는 책들을 한 번에 채운다 */}
+          {isAdmin && uncategorizedCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto"
+              onClick={handleAutoClassify}
+              isLoading={isClassifying}
+              disabled={isClassifying}
+            >
+              <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+              미분류 자동 분류
+            </Button>
           )}
         </div>
       )}
