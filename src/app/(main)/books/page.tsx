@@ -157,11 +157,18 @@ export default function BooksPage() {
         return;
       }
       if (preview.updated === 0) {
-        alert(
-          preview.total === 0
-            ? '표지·저자가 비어 있는 책이 없습니다.'
-            : `대상 ${preview.total}권을 찾았지만 네이버에서 정보를 찾지 못했습니다.`
-        );
+        if (preview.total === 0) {
+          alert('표지·저자가 비어 있는 책이 없습니다.');
+        } else if (preview.error) {
+          // 네이버가 오류를 돌려준 경우 — 키/권한 문제일 가능성이 크다
+          alert(
+            `대상 ${preview.total}권을 찾았지만 네이버 검색이 실패했습니다.\n\n${preview.error}`
+          );
+        } else {
+          alert(
+            `대상 ${preview.total}권을 찾았지만 네이버에 해당 책이 없습니다.\n제목이 실제 책 제목과 달라서일 수 있습니다.`
+          );
+        }
         return;
       }
 

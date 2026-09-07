@@ -18,10 +18,13 @@ interface NaverItem {
   publisher?: string;
 }
 
-async function searchNaver(query: string): Promise<NaverItem | null> {
-  const clientId = process.env.NAVER_CLIENT_ID;
-  const clientSecret = process.env.NAVER_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
+// 실패 원인을 화면까지 전달하기 위해 마지막 오류를 담아둔다.
+// (17권이 전부 실패해도 '못 찾음'이라고만 나오면 원인을 알 수 없다)
+let lastError: string | null = null;
+
+async function searchNaverOnce(query: string): Promise<NaverItem | null> {
+  const clientId = process.env.NAVER_CLIENT_ID!;
+  const clientSecret = process.env.NAVER_CLIENT_SECRET!;
 
   const res = await fetch(
     `https://openapi.naver.com/v1/search/book.json?query=${encodeURIComponent(query)}&display=1`,
@@ -32,9 +35,37 @@ async function searchNaver(query: string): Promise<NaverItem | null> {
       },
     }
   );
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    lastError = `네이버 API ${res.status}: ${body.slice(0, 200)}`;
+    console.error('naver search 실패:', query, lastError);
+    return null;
+  }
   const data = await res.json();
   return data.items?.[0] ?? null;
+}
+
+/**
+ * 모임에서 붙인 제목('쾌락(+자유론)', '군주론: 마키아벨리')은 실제 책 제목과 달라
+ * 그대로는 검색이 안 되는 경우가 있다. 원본 → 단순화한 형태 순으로 시도한다.
+ */
+function queryCandidates(title: string): string[] {
+  const out = [title];
+  const noParen = title.replace(/[(（][^)）]*[)）]/g, ' ').trim();
+  const noPunct = noParen.replace(/[:：·-]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (noPunct && noPunct !== title) out.push(noPunct);
+  // 마지막 수단: 첫 단어 두 개 정도만 (부제가 붙은 경우 대비)
+  const head = noPunct.split(' ').slice(0, 2).join(' ');
+  if (head && head.length >= 2 && !out.includes(head)) out.push(head);
+  return out;
+}
+
+async function searchNaver(title: string): Promise<NaverItem | null> {
+  for (const q of queryCandidates(title)) {
+    const item = await searchNaverOnce(q);
+    if (item) return item;
+  }
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -64,6 +95,8 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    lastError = null;
 
     let dryRun = false;
     try {
@@ -124,6 +157,8 @@ export async function POST(request: Request) {
       updated: planned.length,
       notFound,
       planned: planned.slice(0, 30),
+      // 전부 실패했을 때 원인을 알 수 있도록 마지막 API 오류를 함께 돌려준다
+      error: planned.length === 0 && lastError ? lastError : undefined,
     });
   } catch (error) {
     console.error('Books backfill error:', error);
