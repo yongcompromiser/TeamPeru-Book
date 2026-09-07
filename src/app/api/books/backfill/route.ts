@@ -56,24 +56,31 @@ export async function POST(request: Request) {
     let lastError: string | null = null;
 
     let dryRun = false;
+    let bookId: string | null = null;
+    // force: 이미 값이 있어도 덮어쓴다. 잘못 매칭된 책을 다시 가져올 때 쓴다.
+    let force = false;
     try {
       const body = await request.json();
       dryRun = body?.dryRun === true;
+      bookId = typeof body?.bookId === 'string' ? body.bookId : null;
+      force = body?.force === true;
     } catch {
       /* 본문 없으면 실제 실행 */
     }
 
-    const { data: books, error } = await adminClient
-      .from('books')
-      .select('id, title, author, cover_url, isbn, description');
+    let query = adminClient.from('books').select('id, title, author, cover_url, isbn, description');
+    if (bookId) query = query.eq('id', bookId);
+    const { data: books, error } = await query;
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     const isBlank = (v: unknown) => !v || String(v).trim().length === 0;
-    const targets = (books ?? []).filter(
-      (b) => isBlank(b.cover_url) || isBlank(b.author) || isBlank(b.description)
-    );
+    const targets = force
+      ? (books ?? [])
+      : (books ?? []).filter(
+          (b) => isBlank(b.cover_url) || isBlank(b.author) || isBlank(b.description)
+        );
 
     const planned: { id: string; title: string; author: string; hasCover: boolean }[] = [];
     const notFound: string[] = [];
@@ -87,11 +94,14 @@ export async function POST(request: Request) {
         continue;
       }
 
+      // force 면 기존 값을 덮어쓴다(잘못 매칭된 책 교정용).
+      const shouldSet = (current: unknown) => force || isBlank(current);
+
       const patch: Record<string, unknown> = {};
-      if (isBlank(b.cover_url) && item.image) patch.cover_url = item.image;
-      if (isBlank(b.author) && item.author) patch.author = item.author;
-      if (isBlank(b.description) && item.description) patch.description = item.description;
-      if (isBlank(b.isbn) && item.isbn) patch.isbn = item.isbn;
+      if (shouldSet(b.cover_url) && item.image) patch.cover_url = item.image;
+      if (shouldSet(b.author) && item.author) patch.author = item.author;
+      if (shouldSet(b.description) && item.description) patch.description = item.description;
+      if (shouldSet(b.isbn) && item.isbn) patch.isbn = item.isbn;
 
       if (Object.keys(patch).length === 0) continue;
 

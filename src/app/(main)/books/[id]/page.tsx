@@ -27,6 +27,9 @@ export default function BookDetailPage({ params }: PageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
+  const [isRefetching, setIsRefetching] = useState(false);
 
   useEffect(() => {
     fetchBook();
@@ -42,6 +45,7 @@ export default function BookDetailPage({ params }: PageProps) {
           if (found) {
             setBook(found);
             setReasonInput(found.selection_reason || '');
+            setTitleInput(found.title || '');
           }
         }
       }
@@ -67,6 +71,55 @@ export default function BookDetailPage({ params }: PageProps) {
       console.error('Failed to save:', e);
     }
     setIsSaving(false);
+  };
+
+  // 제목이 실제 책과 다르면 표지·저자가 엉뚱하게 매칭된다. 제목을 고치고
+  // 그 제목으로 책 정보를 다시 가져온다(기존 값을 덮어씀).
+  const handleSaveTitleAndRefetch = async () => {
+    const newTitle = titleInput.trim();
+    if (!newTitle) {
+      alert('제목을 입력해주세요.');
+      return;
+    }
+
+    setIsRefetching(true);
+    try {
+      if (newTitle !== book.title) {
+        const res = await fetch('/api/books', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, title: newTitle }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          alert(data.error || '제목 변경에 실패했습니다.');
+          return;
+        }
+      }
+
+      const res = await fetch('/api/books/backfill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId: id, force: true }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(result.error || '책 정보를 가져오지 못했습니다.');
+      } else if (result.updated === 0) {
+        alert(
+          result.error
+            ? `책 검색이 실패했습니다.\n\n${result.error}`
+            : '이 제목으로는 책을 찾지 못했습니다. 제목을 조금 더 정확히 적어보세요.'
+        );
+      }
+
+      setIsEditingTitle(false);
+      await fetchBook();
+    } catch {
+      alert('책 정보를 가져오지 못했습니다.');
+    } finally {
+      setIsRefetching(false);
+    }
   };
 
   // 분야는 등록 시 자동 추천된 값이라 틀릴 수 있으므로 누구나 바로 고칠 수 있게 한다.
@@ -162,10 +215,55 @@ export default function BookDetailPage({ params }: PageProps) {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
-                <h1 className="text-2xl font-bold text-gray-900">{book.title}</h1>
-                <Badge variant={book.status === 'completed' ? 'success' : book.status === 'selected' ? 'info' : 'default'}>
-                  {BOOK_STATUS_LABELS[book.status as keyof typeof BOOK_STATUS_LABELS] || book.status}
-                </Badge>
+                {isEditingTitle ? (
+                  <div className="flex-1 space-y-2">
+                    <input
+                      value={titleInput}
+                      onChange={(e) => setTitleInput(e.target.value)}
+                      disabled={isRefetching}
+                      placeholder="실제 책 제목"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-lg font-bold text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    <p className="text-xs text-gray-500">
+                      제목을 저장하면 그 제목으로 표지·저자·설명을 다시 가져옵니다.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSaveTitleAndRefetch} isLoading={isRefetching}>
+                        <Check className="w-4 h-4 mr-1" />
+                        저장 후 다시 찾기
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isRefetching}
+                        onClick={() => {
+                          setIsEditingTitle(false);
+                          setTitleInput(book.title || '');
+                        }}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        취소
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h1 className="text-2xl font-bold text-gray-900">{book.title}</h1>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingTitle(true)}
+                      title="제목 수정 후 책 정보 다시 찾기"
+                      className="text-gray-400 hover:text-gray-700 shrink-0"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                {!isEditingTitle && (
+                  <Badge variant={book.status === 'completed' ? 'success' : book.status === 'selected' ? 'info' : 'default'}>
+                    {BOOK_STATUS_LABELS[book.status as keyof typeof BOOK_STATUS_LABELS] || book.status}
+                  </Badge>
+                )}
               </div>
 
               <p className="text-lg text-gray-600 mt-1">{book.author}</p>
