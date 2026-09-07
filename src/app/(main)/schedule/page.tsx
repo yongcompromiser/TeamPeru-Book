@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Check, Users, Calendar, Book, Vote } from 'lucide-react';
@@ -81,6 +81,11 @@ export default function SchedulePage() {
   const [bookCandidates, setBookCandidates] = useState<BookCandidate[]>([]);
   const [bookVotes, setBookVotes] = useState<BookVote[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null);
+  // state 는 같은 틱 안에서 갱신이 보장되지 않아, 빠른 더블클릭이 두 번 통과할 수 있다.
+  // 즉시 반영되는 ref 로 한 번 더 막는다.
+  const confirmingRef = useRef(false);
 
   // Time/Location editing states
   const [editingDetails, setEditingDetails] = useState(false);
@@ -344,6 +349,9 @@ export default function SchedulePage() {
 
   const handleConfirmSchedule = async () => {
     if (!selectedDate || !isAdmin || !selectedPresenter) return;
+    // 더블클릭으로 요청이 두 번 나가 일정이 중복 생성되는 것을 막는다.
+    if (confirmingRef.current) return;
+    confirmingRef.current = true;
 
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
 
@@ -353,11 +361,12 @@ export default function SchedulePage() {
     );
 
     if (existingSchedule) {
+      confirmingRef.current = false;
       alert('이미 확정된 일정입니다.');
       return;
     }
 
-    // API를 통해 먼저 시도
+    setIsConfirming(true);
     try {
       const res = await fetch('/api/schedule', {
         method: 'POST',
@@ -376,33 +385,60 @@ export default function SchedulePage() {
         await fetchAllData();
         return;
       }
-    } catch (e) {
-      console.log('API confirm failed, trying direct');
+
+      // 서버가 거절한 경우(중복·권한 등)에는 직접 insert 로 폴백하지 않는다.
+      // 폴백하면 서버의 중복 방지를 그대로 우회해 버린다.
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || '일정 확정에 실패했습니다.');
+      await fetchAllData();
+    } catch {
+      // 네트워크 오류로 응답을 못 받은 경우. 이미 저장됐을 수도 있으므로
+      // 임의로 다시 만들지 말고 현재 상태를 새로고침해서 확인하도록 한다.
+      alert('일정 확정 요청을 보내지 못했습니다. 새로고침 후 확인해주세요.');
+      await fetchAllData();
+    } finally {
+      setIsConfirming(false);
+      confirmingRef.current = false;
     }
+  };
 
-    // API 실패시 직접 호출
-    const { error } = await supabase.from('schedules').insert({
-      title: `${format(selectedDate, 'M월 d일')} 모임`,
-      meeting_date: new Date(dateKey).toISOString(),
-      presenter_id: selectedPresenter,
-      created_by: user?.id,
-      status: 'confirmed',
-    });
+  // 같은 날짜에 2건 이상 확정된 일정(과거 더블클릭 등으로 생긴 중복)
+  const duplicateGroups = (() => {
+    const byDate = new Map<string, Schedule[]>();
+    for (const s of schedules) {
+      const key = format(new Date(s.meeting_date), 'yyyy-MM-dd');
+      byDate.set(key, [...(byDate.get(key) ?? []), s]);
+    }
+    return [...byDate.entries()]
+      .filter(([, list]) => list.length > 1)
+      .sort((a, b) => a[0].localeCompare(b[0]));
+  })();
 
-    if (error) {
-      alert('일정 생성에 실패했습니다.');
+  const handleDeleteDuplicate = async (schedule: Schedule) => {
+    if (!isAdmin) return;
+    if (
+      !confirm(
+        '이 일정을 삭제합니다. 여기에 달린 발제·한줄평·후보책도 함께 지워집니다.\n계속할까요?'
+      )
+    )
       return;
+
+    setDeletingScheduleId(schedule.id);
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel', scheduleId: schedule.id }),
+      });
+      if (res.ok) {
+        await fetchAllData();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '삭제에 실패했습니다.');
+      }
+    } finally {
+      setDeletingScheduleId(null);
     }
-
-    await supabase
-      .from('schedule_votes')
-      .delete()
-      .eq('vote_date', dateKey);
-
-    alert('일정이 확정되었습니다!');
-    setShowConfirmModal(false);
-    setSelectedPresenter('');
-    await fetchAllData();
   };
 
   const handleAddBookCandidate = async (bookId: string) => {
@@ -652,6 +688,58 @@ export default function SchedulePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">모임 일정</h1>
       </div>
+
+      {/* 같은 날짜에 일정이 2건 이상일 때만 뜨는 정리 패널. 정리하면 사라진다. */}
+      {isAdmin && duplicateGroups.length > 0 && (
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader>
+            <CardTitle className="text-base text-red-800">
+              같은 날짜에 일정이 중복되어 있습니다
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-red-700">
+              남길 것 하나만 두고 나머지를 삭제하세요. 발제·한줄평이 달린 쪽을 남기는 것이
+              안전합니다.
+            </p>
+            {duplicateGroups.map(([dateKey, list]) => (
+              <div key={dateKey} className="space-y-2">
+                <p className="text-sm font-medium text-red-900">
+                  {format(new Date(dateKey), 'M월 d일 (E)', { locale: ko })} · {list.length}건
+                </p>
+                {list.map((s) => {
+                  const presenterName = members.find((m) => m.id === s.presenter_id)?.name;
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 bg-white rounded-lg border border-red-200 px-4 py-3"
+                    >
+                      <div className="min-w-0 text-sm">
+                        <p className="font-medium text-gray-900 truncate">{s.title}</p>
+                        <p className="text-xs text-gray-500">
+                          발제자 {presenterName ?? '없음'} · 책{' '}
+                          {s.selected_book_id ? '선정됨' : '미선정'}
+                          {s.meeting_time ? ` · ${s.meeting_time}` : ''}
+                          {s.location ? ` · ${s.location}` : ''}
+                        </p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={deletingScheduleId !== null}
+                        isLoading={deletingScheduleId === s.id}
+                        onClick={() => handleDeleteDuplicate(s)}
+                      >
+                        삭제
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Calendar */}
@@ -1105,10 +1193,11 @@ export default function SchedulePage() {
             <div className="flex gap-2">
               <Button
                 onClick={handleConfirmSchedule}
-                disabled={!selectedPresenter}
+                disabled={!selectedPresenter || isConfirming}
+                isLoading={isConfirming}
                 className="flex-1"
               >
-                확정
+                {isConfirming ? '확정 중...' : '확정'}
               </Button>
               <Button
                 variant="outline"

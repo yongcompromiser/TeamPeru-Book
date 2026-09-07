@@ -138,7 +138,45 @@ export async function POST(request: Request) {
     if (action === 'confirm') {
       // 일정 확정
       const { date, presenterId, bookId } = data;
-      const { error } = await supabase
+      if (!date) {
+        return NextResponse.json({ error: 'date required' }, { status: 400 });
+      }
+
+      // 관리자만 확정 가능
+      const { data: confirmProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (confirmProfile?.role !== 'admin') {
+        return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 });
+      }
+
+      const admin = createAdminClient();
+
+      // 같은 날짜에 이미 일정이 있으면 막는다.
+      // 확정 버튼 더블클릭으로 요청이 두 번 날아오면 클라이언트의 중복 검사(로컬 state)
+      // 만으로는 둘 다 통과하므로, 서버에서 최종적으로 한 번 더 확인한다.
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      const { data: sameDay } = await admin
+        .from('schedules')
+        .select('id')
+        .gte('meeting_date', dayStart.toISOString())
+        .lt('meeting_date', dayEnd.toISOString())
+        .limit(1);
+
+      if (sameDay && sameDay.length > 0) {
+        return NextResponse.json(
+          { error: '이미 이 날짜에 확정된 일정이 있습니다.' },
+          { status: 409 }
+        );
+      }
+
+      const { error } = await admin
         .from('schedules')
         .insert({
           title: '정기 모임',
