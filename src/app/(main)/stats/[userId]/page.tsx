@@ -221,7 +221,7 @@ export default function MemberStatsPage() {
     );
   }
 
-  const { summary: s, monthly, rating_distribution, categories, books, presented } = detail;
+  const { summary: s, yearly, rating_distribution, categories, books, presented } = detail;
   const maxDist = Math.max(1, ...rating_distribution.map((d) => d.count));
   const comment = ratingComment(s.avg_rating);
 
@@ -287,32 +287,33 @@ export default function MemberStatsPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Calendar className="w-4 h-4 text-gray-500" />
-            월별 참여 추이
+            연도별 참여
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {monthly.length === 0 ? (
+          {yearly.length === 0 ? (
             <p className="text-sm text-gray-500 py-4 text-center">아직 지난 모임이 없습니다.</p>
           ) : (
-            <div className="flex items-end gap-2 overflow-x-auto pb-2">
-              {monthly.map((m) => {
-                const ratio = m.total > 0 ? m.participated / m.total : 0;
+            <div className="space-y-3">
+              {yearly.map((y) => {
+                const ratio = y.total > 0 ? y.participated / y.total : 0;
                 return (
-                  <div key={m.month} className="flex flex-col items-center gap-1 min-w-[44px]">
-                    <span className="text-[11px] text-gray-500">
-                      {m.participated}/{m.total}
+                  <div key={y.year} className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700 w-12 shrink-0">
+                      {y.year}
                     </span>
-                    <div className="w-8 h-24 bg-gray-100 rounded-md flex items-end overflow-hidden">
+                    <div className="flex-1 h-6 bg-gray-100 rounded-md overflow-hidden">
                       <div
                         className={cn(
-                          'w-full rounded-md transition-all',
+                          'h-full rounded-md transition-all',
                           ratio >= 0.8 ? 'bg-green-400' : ratio > 0 ? 'bg-amber-400' : 'bg-gray-200'
                         )}
-                        style={{ height: `${Math.max(ratio * 100, ratio > 0 ? 8 : 3)}%` }}
+                        style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 6 : 0)}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                      {m.month.slice(2).replace('-', '.')}
+                    <span className="text-sm text-gray-600 tabular-nums w-24 text-right shrink-0">
+                      {y.participated}회
+                      <span className="text-xs text-gray-400"> / {y.total}회</span>
                     </span>
                   </div>
                 );

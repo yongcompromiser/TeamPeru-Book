@@ -44,7 +44,7 @@ export interface MemberSummary {
   board_post_count: number;
   comment_count: number;
 
-  activity_score: number; // 정렬용 종합 활동량
+  activity_score: number; // 정렬용 종합 지표. 화면에는 '영향력'으로 표시한다
 }
 
 export interface CategorySlice {
@@ -421,8 +421,10 @@ export function buildMemberSummaries(data: StatsData): {
 
 // ── 개인 상세 ────────────────────────────────────────────────────────────
 
-export interface MonthlyPoint {
-  month: string; // yyyy-MM
+// 모임이 한 달에 한 번꼴이라 월별로 끊으면 막대가 대부분 0/1 이 되어 읽기 어렵다.
+// 연도별로 묶는다.
+export interface YearlyPoint {
+  year: string; // yyyy
   participated: number;
   total: number;
 }
@@ -444,7 +446,7 @@ export interface ReadBook {
 
 export interface MemberDetail {
   summary: MemberSummary;
-  monthly: MonthlyPoint[];
+  yearly: YearlyPoint[];
   rating_distribution: { rating: number; count: number }[];
   categories: CategorySlice[]; // 이 멤버가 참여한 모임의 책 분야 분포
   books: ReadBook[];
@@ -462,9 +464,8 @@ export interface PresentedMeeting {
   book_cover: string | null;
 }
 
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+function yearKey(iso: string): string {
+  return String(new Date(iso).getFullYear());
 }
 
 export function buildMemberDetail(data: StatsData, summary: MemberSummary): MemberDetail {
@@ -494,19 +495,18 @@ export function buildMemberDetail(data: StatsData, summary: MemberSummary): Memb
 
   const bookMap = new Map(data.books.map((b) => [b.id as string, b]));
 
-  // 월별 참여 추이 (오래된 순)
-  const monthlyMap = new Map<string, { participated: number; total: number }>();
+  // 연도별 참여 추이 (오래된 순)
+  const yearlyMap = new Map<string, { participated: number; total: number }>();
   for (const s of [...relevant].reverse()) {
-    const key = monthKey(s.meeting_date as string);
-    const cur = monthlyMap.get(key) ?? { participated: 0, total: 0 };
+    const key = yearKey(s.meeting_date as string);
+    const cur = yearlyMap.get(key) ?? { participated: 0, total: 0 };
     cur.total += 1;
     if (participatedSet.has(s.id as string)) cur.participated += 1;
-    monthlyMap.set(key, cur);
+    yearlyMap.set(key, cur);
   }
-  const monthly: MonthlyPoint[] = [...monthlyMap.entries()].map(([month, v]) => ({
-    month,
-    ...v,
-  }));
+  const yearly: YearlyPoint[] = [...yearlyMap.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([year, v]) => ({ year, ...v }));
 
   // 별점 분포
   const dist = new Map<number, number>([1, 2, 3, 4, 5].map((n) => [n, 0]));
@@ -566,7 +566,7 @@ export function buildMemberDetail(data: StatsData, summary: MemberSummary): Memb
 
   return {
     summary,
-    monthly,
+    yearly,
     rating_distribution,
     categories: buildCategoryDistribution(books.map((b) => b.category)),
     books,

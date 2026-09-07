@@ -113,7 +113,7 @@ const columns: Column[] = [
   },
   {
     key: 'activity_score',
-    label: '활동량',
+    label: '영향력',
     hint: '참석·발제·한줄평·게시글·댓글·책등록을 가중 합산한 값',
     render: (m) => m.activity_score,
     value: (m) => m.activity_score,
