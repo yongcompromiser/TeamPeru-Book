@@ -19,7 +19,6 @@ type ColumnKey =
   | 'absent_count'
   | 'presenter_count'
   | 'discussion_count'
-  | 'one_liner_count'
   | 'avg_rating'
   | 'books_registered'
   | 'board_post_count'
@@ -78,13 +77,6 @@ const columns: Column[] = [
     hint: '작성한 발제 문항 총합',
     render: (m) => m.discussion_count,
     value: (m) => m.discussion_count,
-  },
-  {
-    key: 'one_liner_count',
-    label: '한줄평',
-    hint: '한줄평을 남긴 모임 수',
-    render: (m) => m.one_liner_count,
-    value: (m) => m.one_liner_count,
   },
   {
     key: 'avg_rating',

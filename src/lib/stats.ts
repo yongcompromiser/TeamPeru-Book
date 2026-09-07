@@ -448,7 +448,18 @@ export interface MemberDetail {
   rating_distribution: { rating: number; count: number }[];
   categories: CategorySlice[]; // 이 멤버가 참여한 모임의 책 분야 분포
   books: ReadBook[];
-  presented: { schedule_id: string; title: string; meeting_date: string }[];
+  presented: PresentedMeeting[];
+}
+
+// 사이트에서 확정한 모임은 제목이 일괄 '정기 모임'이라 목록에서 구분이 안 된다.
+// 그래서 그 모임에서 읽은 책을 함께 담아 화면에서 책으로 보여준다.
+export interface PresentedMeeting {
+  schedule_id: string;
+  title: string;
+  meeting_date: string;
+  book_title: string | null;
+  book_author: string | null;
+  book_cover: string | null;
 }
 
 function monthKey(iso: string): string {
@@ -541,11 +552,17 @@ export function buildMemberDetail(data: StatsData, summary: MemberSummary): Memb
         new Date(b.meeting_date as string).getTime() -
         new Date(a.meeting_date as string).getTime()
     )
-    .map((s) => ({
-      schedule_id: s.id as string,
-      title: (s.title as string) ?? '',
-      meeting_date: s.meeting_date as string,
-    }));
+    .map((s) => {
+      const b = bookMap.get(s.selected_book_id as string);
+      return {
+        schedule_id: s.id as string,
+        title: (s.title as string) ?? '',
+        meeting_date: s.meeting_date as string,
+        book_title: (b?.title as string | undefined) ?? null,
+        book_author: (b?.author as string | undefined) ?? null,
+        book_cover: (b?.cover_url as string | undefined) ?? null,
+      };
+    });
 
   return {
     summary,

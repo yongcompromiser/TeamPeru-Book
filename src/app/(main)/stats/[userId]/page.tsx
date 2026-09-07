@@ -258,12 +258,7 @@ export default function MemberStatsPage() {
           sub={`대상 모임 ${s.attendable}회`}
           icon={UserCheck}
         />
-        <StatTile
-          label="발제 문항"
-          value={`${s.discussion_count}개`}
-          sub={`한줄평 ${s.one_liner_count}회`}
-          icon={FileText}
-        />
+        <StatTile label="발제 문항" value={`${s.discussion_count}개`} icon={FileText} />
         <StatTile
           label="평균 별점"
           value={s.avg_rating === null ? '-' : s.avg_rating.toFixed(1)}
@@ -407,10 +402,6 @@ export default function MemberStatsPage() {
                 <dt className="text-gray-600">댓글</dt>
                 <dd className="font-semibold text-gray-900">{s.comment_count}</dd>
               </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-gray-600">한줄평</dt>
-                <dd className="font-semibold text-gray-900">{s.one_liner_count}</dd>
-              </div>
             </dl>
           </CardContent>
         </Card>
@@ -426,21 +417,36 @@ export default function MemberStatsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
+            {/* 모임 제목은 사이트에서 확정하면 일괄 '정기 모임'이라 구분이 안 된다.
+                그래서 그 모임에서 읽은 책으로 보여준다. */}
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
               {presented.map((p) => (
-                <li key={p.schedule_id}>
-                  <Link
-                    href={`/meetings/${p.schedule_id}`}
-                    className="flex items-center justify-between text-sm py-1.5 hover:text-amber-700"
-                  >
-                    <span className="truncate">{p.title}</span>
-                    <span className="text-xs text-gray-400 shrink-0 ml-3">
-                      {format(new Date(p.meeting_date), 'yyyy.MM.dd')}
-                    </span>
-                  </Link>
-                </li>
+                <Link key={p.schedule_id} href={`/meetings/${p.schedule_id}`} className="group">
+                  <div className="aspect-[2/3] rounded-md overflow-hidden bg-gray-100 border border-gray-200 group-hover:border-amber-300 transition-colors">
+                    {p.book_cover ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.book_cover}
+                        alt={p.book_title ?? p.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center p-1">
+                        <span className="text-[10px] text-gray-500 text-center line-clamp-4">
+                          {p.book_title ?? p.title}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-gray-700 mt-1 truncate group-hover:text-amber-700">
+                    {p.book_title ?? p.title}
+                  </p>
+                  <p className="text-[10px] text-gray-400">
+                    {format(new Date(p.meeting_date), 'yyyy.MM.dd')}
+                  </p>
+                </Link>
               ))}
-            </ul>
+            </div>
           </CardContent>
         </Card>
       )}
