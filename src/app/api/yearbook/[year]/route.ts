@@ -5,7 +5,8 @@ import { loadStatsData } from '@/lib/stats';
 import { buildYearBook } from '@/lib/yearbook';
 import { YEAR_THEMES, DEFAULT_THEME_KEY } from '@/lib/yearbook-themes';
 
-const VIEWABLE_ROLES = ['member', 'admin'];
+// 연말결산은 아직 다듬는 중이라 관리자에게만 보인다.
+const VIEWABLE_ROLES = ['admin'];
 
 async function getRole(userId: string) {
   const adminClient = createAdminClient();

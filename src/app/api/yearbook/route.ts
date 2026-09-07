@@ -4,8 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { loadStatsData } from '@/lib/stats';
 import { listYears } from '@/lib/yearbook';
 
-// 결산이 있는 연도 목록. 통계와 같은 기준으로 정회원만 볼 수 있다.
-const VIEWABLE_ROLES = ['member', 'admin'];
+// 결산이 있는 연도 목록. 아직 다듬는 중이라 관리자에게만 보인다.
+const VIEWABLE_ROLES = ['admin'];
 
 export async function GET() {
   try {

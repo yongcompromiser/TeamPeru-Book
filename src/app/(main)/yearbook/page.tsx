@@ -26,7 +26,8 @@ interface YearItem {
 
 export default function YearbookListPage() {
   const { profile } = useAuth();
-  const canView = profile?.role === 'member' || profile?.role === 'admin';
+  // 연말결산은 아직 다듬는 중이라 관리자에게만 보인다.
+  const canView = profile?.role === 'admin';
 
   const [years, setYears] = useState<YearItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,7 +62,7 @@ export default function YearbookListPage() {
     return (
       <div className="text-center py-12">
         <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">정회원만 볼 수 있습니다</p>
+        <p className="text-gray-500">관리자만 접근할 수 있습니다</p>
       </div>
     );
   }

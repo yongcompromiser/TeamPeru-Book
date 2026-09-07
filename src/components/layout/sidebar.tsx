@@ -33,12 +33,13 @@ const menuItems = [
 ];
 
 // 정회원에게만 보이는 메뉴. 게스트/가입대기는 모임 내부 기록이라 제외한다.
-const memberMenuItems = [
-  { href: '/stats', label: '멤버 통계', icon: BarChart3 },
-  { href: '/yearbook', label: '연말결산', icon: Trophy },
-];
+const memberMenuItems = [{ href: '/stats', label: '멤버 통계', icon: BarChart3 }];
 
-const adminMenuItems = [{ href: '/admin', label: '관리자', icon: Settings }];
+const adminMenuItems = [
+  // 연말결산은 아직 다듬는 중이라 관리자에게만 노출한다
+  { href: '/yearbook', label: '연말결산', icon: Trophy },
+  { href: '/admin', label: '관리자', icon: Settings },
+];
 
 export function Sidebar({ profile, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
