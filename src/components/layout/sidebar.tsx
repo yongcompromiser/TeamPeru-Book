@@ -31,14 +31,17 @@ const menuItems = [
   // { href: '/gallery', label: '갤러리', icon: Camera }, // 임시 비활성화
 ];
 
-const adminMenuItems = [
-  { href: '/stats', label: '멤버 통계', icon: BarChart3 },
-  { href: '/admin', label: '관리자', icon: Settings },
-];
+// 정회원에게만 보이는 메뉴. 게스트/가입대기는 모임 내부 기록이라 제외한다.
+const memberMenuItems = [{ href: '/stats', label: '멤버 통계', icon: BarChart3 }];
+
+const adminMenuItems = [{ href: '/admin', label: '관리자', icon: Settings }];
 
 export function Sidebar({ profile, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const isAdmin = profile?.role === 'admin';
+  const isMember = profile?.role === 'member' || isAdmin;
+
+  const visibleItems = [...menuItems, ...(isMember ? memberMenuItems : [])];
 
   return (
     <>
@@ -71,7 +74,7 @@ export function Sidebar({ profile, isOpen, onClose }: SidebarProps) {
         {/* Navigation */}
         <nav className="px-4 py-6 lg:pt-6">
           <ul className="space-y-1">
-            {menuItems.map((item) => {
+            {visibleItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <li key={item.href}>

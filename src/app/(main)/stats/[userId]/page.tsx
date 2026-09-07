@@ -157,14 +157,15 @@ export default function MemberStatsPage() {
   const params = useParams();
   const userId = params.userId as string;
   const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
+  // 정회원이면 볼 수 있다. 게스트/가입대기는 모임 내부 기록이라 제외.
+  const canView = profile?.role === 'member' || profile?.role === 'admin';
 
   const [detail, setDetail] = useState<MemberDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canView) {
       setIsLoading(false);
       return;
     }
@@ -190,13 +191,13 @@ export default function MemberStatsPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, userId]);
+  }, [canView, userId]);
 
-  if (!isAdmin) {
+  if (!canView) {
     return (
       <div className="text-center py-12">
         <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">관리자만 접근할 수 있습니다</p>
+        <p className="text-gray-500">정회원만 볼 수 있습니다</p>
       </div>
     );
   }

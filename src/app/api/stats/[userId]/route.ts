@@ -3,7 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadStatsData, buildMemberSummaries, buildMemberDetail } from '@/lib/stats';
 
-// 멤버 개인 상세 통계 (관리자 전용).
+// 멤버 개인 상세 통계. 정회원(member/admin)이면 볼 수 있다.
+const VIEWABLE_ROLES = ['member', 'admin'];
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ userId: string }> }
@@ -26,7 +28,7 @@ export async function GET(
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if (!profile || !VIEWABLE_ROLES.includes(profile.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
