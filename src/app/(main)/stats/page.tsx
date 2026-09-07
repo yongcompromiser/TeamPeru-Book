@@ -8,12 +8,15 @@ import { Avatar } from '@/components/ui/avatar';
 import { CategoryDistribution } from '@/components/features/category-distribution';
 import { cn } from '@/lib/utils';
 import { Shield, Users, Calendar, BookOpen, UserCheck, ArrowUpDown, Tag } from 'lucide-react';
+import { formatLateMinutes } from '@/lib/attendance';
 import type { MemberSummary, OverallSummary } from '@/lib/stats';
 
 // 표의 각 열. numeric 항목은 우측 정렬 + 헤더 클릭으로 내림차순 정렬한다.
 type ColumnKey =
   | 'name'
   | 'participated'
+  | 'late_count'
+  | 'absent_count'
   | 'presenter_count'
   | 'discussion_count'
   | 'one_liner_count'
@@ -38,6 +41,29 @@ const columns: Column[] = [
     hint: '참석한 모임 횟수',
     render: (m) => `${m.participated}회`,
     value: (m) => m.participated,
+  },
+  {
+    key: 'late_count',
+    label: '지각',
+    hint: '지각 횟수 (괄호는 지각한 날의 평균 지각 시간)',
+    render: (m) => (
+      <>
+        {m.late_count}
+        {m.avg_late_minutes !== null && (
+          <span className="text-amber-600 text-xs ml-1">
+            (평균 {formatLateMinutes(m.avg_late_minutes)})
+          </span>
+        )}
+      </>
+    ),
+    value: (m) => m.late_count,
+  },
+  {
+    key: 'absent_count',
+    label: '불참',
+    hint: '불참으로 기록된 횟수',
+    render: (m) => m.absent_count,
+    value: (m) => m.absent_count,
   },
   {
     key: 'presenter_count',

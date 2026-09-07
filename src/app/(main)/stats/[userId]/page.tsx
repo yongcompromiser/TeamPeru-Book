@@ -22,7 +22,9 @@ import {
   Calendar,
   ThumbsUp,
   Tag,
+  Clock,
 } from 'lucide-react';
+import { formatLateMinutes } from '@/lib/attendance';
 import { CategoryDistribution } from '@/components/features/category-distribution';
 import type { MemberDetail, ReadBook } from '@/lib/stats';
 
@@ -248,7 +250,7 @@ export default function MemberStatsPage() {
       </div>
 
       {/* 핵심 지표 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <StatTile
           label="참석"
           value={`${s.participated}회`}
@@ -266,6 +268,16 @@ export default function MemberStatsPage() {
           value={s.avg_rating === null ? '-' : s.avg_rating.toFixed(1)}
           sub={`${s.rating_count}회 평가`}
           icon={Star}
+        />
+        <StatTile
+          label="지각"
+          value={`${s.late_count}회`}
+          sub={
+            s.avg_late_minutes !== null
+              ? `평균 ${formatLateMinutes(s.avg_late_minutes)} · 불참 ${s.absent_count}회`
+              : `정시 ${s.on_time_count}회 · 불참 ${s.absent_count}회`
+          }
+          icon={Clock}
         />
         <StatTile
           label="발제자 담당"

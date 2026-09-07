@@ -31,14 +31,25 @@ import {
   Link2,
   Copy,
   Users,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
+import {
+  getVerdict,
+  getLateMinutes,
+  formatLateMinutes,
+  ARRIVAL_VERDICT_LABELS,
+  type ArrivalRecord,
+  type ArrivalVerdict,
+} from '@/lib/attendance';
 
 interface Schedule {
   id: string;
   title: string;
   meeting_date: string;
+  meeting_time?: string | null;
+  location?: string | null;
   description?: string | null;
   presenter_id: string | null;
   selected_book_id: string | null;
@@ -137,6 +148,10 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [isSavingReason, setIsSavingReason] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // 출결 상태
+  const [arrivals, setArrivals] = useState<ArrivalRecord[]>([]);
+  const [savingArrivalFor, setSavingArrivalFor] = useState<string | null>(null);
+
   // 탭 상태
   const [activeTab, setActiveTab] = useState<'info' | 'minutes'>('info');
 
@@ -213,7 +228,47 @@ export default function MeetingDetailPage({ params }: PageProps) {
     }
   }, [id, user]);
 
+  const fetchArrivals = async () => {
+    try {
+      const res = await fetch(`/api/meetings/${id}/arrivals`);
+      if (res.ok) {
+        const data = await res.json();
+        setArrivals(data.arrivals || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch arrivals:', e);
+    }
+  };
+
+  // 출결 저장. status 를 null 로 주면 '미기록'으로 되돌린다.
+  const saveArrival = async (
+    userId: string,
+    status: 'attended' | 'absent' | null,
+    arrivedAt: string | null
+  ) => {
+    setSavingArrivalFor(userId);
+    try {
+      const res = await fetch(`/api/meetings/${id}/arrivals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, status, arrivedAt }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '출결 저장에 실패했습니다.');
+        return;
+      }
+      await fetchArrivals();
+    } catch {
+      alert('출결 저장에 실패했습니다.');
+    } finally {
+      setSavingArrivalFor(null);
+    }
+  };
+
   const fetchMeetingData = async () => {
+    fetchArrivals();
+
     // API를 통해 먼저 시도
     try {
       const res = await fetch(`/api/meetings/${id}`);
@@ -749,6 +804,32 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const meetingDate = new Date(schedule.meeting_date);
   const submittedCount = submissionStatuses.filter(s => s.has_submitted).length;
 
+  // 출결: 명단은 제출 현황과 같은 회원 목록을 쓴다(게스트 제외).
+  const arrivalMap = new Map(arrivals.map((a) => [a.user_id, a]));
+  const attendanceRoster = submissionStatuses.filter((s) => !s.is_guest);
+  const canEditAttendance = profile?.role === 'member' || profile?.role === 'admin';
+  const arrivalCounts = attendanceRoster.reduce(
+    (acc, s) => {
+      const v = getVerdict(schedule?.meeting_time, arrivalMap.get(s.user_id));
+      acc[v] += 1;
+      return acc;
+    },
+    { on_time: 0, late: 0, absent: 0, unknown: 0 } as Record<ArrivalVerdict, number>
+  );
+
+  const VERDICT_STYLES: Record<ArrivalVerdict, string> = {
+    on_time: 'border-green-200 bg-green-50',
+    late: 'border-amber-200 bg-amber-50',
+    absent: 'border-gray-200 bg-gray-100',
+    unknown: 'border-gray-200 bg-white',
+  };
+  const VERDICT_TEXT: Record<ArrivalVerdict, string> = {
+    on_time: 'text-green-700',
+    late: 'text-amber-700',
+    absent: 'text-gray-500',
+    unknown: 'text-gray-400',
+  };
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <Link
@@ -1000,6 +1081,109 @@ export default function MeetingDetailPage({ params }: PageProps) {
               </p>
             ) : (
               <p className="text-gray-400 text-sm">아직 선정 사유가 작성되지 않았습니다.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 출결 · 도착 시각 */}
+      {attendanceRoster.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                출결
+                <span className="text-sm font-normal text-gray-500">
+                  정시 {arrivalCounts.on_time} · 지각 {arrivalCounts.late} · 불참{' '}
+                  {arrivalCounts.absent}
+                  {arrivalCounts.unknown > 0 && ` · 미기록 ${arrivalCounts.unknown}`}
+                </span>
+              </CardTitle>
+              <p className="text-xs text-gray-500">
+                {schedule.meeting_time
+                  ? `모임 시작 ${schedule.meeting_time} 기준으로 지각을 판정합니다`
+                  : '모임 시작 시각이 없어 지각을 판정할 수 없습니다 (일정 화면에서 시간을 입력해주세요)'}
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {attendanceRoster.map((member) => {
+                const record = arrivalMap.get(member.user_id);
+                const verdict = getVerdict(schedule.meeting_time, record);
+                const lateMinutes = getLateMinutes(schedule.meeting_time, record?.arrived_at);
+                const isSaving = savingArrivalFor === member.user_id;
+
+                return (
+                  <div
+                    key={member.user_id}
+                    className={cn(
+                      'flex flex-wrap items-center gap-3 rounded-lg border-2 px-3 py-2 transition-all',
+                      VERDICT_STYLES[verdict]
+                    )}
+                  >
+                    <span className="font-medium text-sm text-gray-900 min-w-[72px]">
+                      {member.user_name}
+                    </span>
+
+                    <span className={cn('text-xs font-semibold min-w-[52px]', VERDICT_TEXT[verdict])}>
+                      {ARRIVAL_VERDICT_LABELS[verdict]}
+                      {verdict === 'late' && lateMinutes !== null && (
+                        <span className="font-normal"> {formatLateMinutes(lateMinutes)}</span>
+                      )}
+                    </span>
+
+                    {canEditAttendance ? (
+                      <div className="flex items-center gap-2 ml-auto">
+                        <input
+                          type="time"
+                          value={record?.arrived_at ?? ''}
+                          disabled={isSaving || record?.status === 'absent'}
+                          onChange={(e) =>
+                            saveArrival(member.user_id, 'attended', e.target.value || null)
+                          }
+                          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 disabled:opacity-40"
+                        />
+                        <Button
+                          size="sm"
+                          variant={record?.status === 'absent' ? 'danger' : 'outline'}
+                          disabled={isSaving}
+                          onClick={() =>
+                            saveArrival(
+                              member.user_id,
+                              record?.status === 'absent' ? 'attended' : 'absent',
+                              null
+                            )
+                          }
+                        >
+                          불참
+                        </Button>
+                        {record && (
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => saveArrival(member.user_id, null, null)}
+                            className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-40"
+                          >
+                            지우기
+                          </button>
+                        )}
+                        {isSaving && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+                      </div>
+                    ) : (
+                      <span className="ml-auto text-xs text-gray-500">
+                        {record?.arrived_at ? `${record.arrived_at} 도착` : ''}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {canEditAttendance && (
+              <p className="text-xs text-gray-400 mt-3">
+                도착 시각을 넣으면 자동으로 정시/지각이 정해집니다. 참여자 누구나 수정할 수 있어요.
+              </p>
             )}
           </CardContent>
         </Card>

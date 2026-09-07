@@ -7,6 +7,7 @@
 // /schedule/[id] 화면에서만 쓰이고 그 화면이 주 동선에 없어 거의 비어 있다.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getLateMinutes, parseTimeToMinutes } from '@/lib/attendance';
 
 // 통계 대상 역할. guest/pending/visitor 는 모수가 달라 지표가 왜곡되므로 제외.
 const COUNTED_ROLES = ['admin', 'member'];
@@ -23,6 +24,13 @@ export interface MemberSummary {
   attendable: number; // 활동 시작 이후 열린 지난 모임 수
   participated: number; // 참석 횟수
   presenter_count: number; // 발제자로 지명된 횟수
+
+  // 출결 (기록이 있는 모임만 집계)
+  on_time_count: number;
+  late_count: number;
+  absent_count: number;
+  total_late_minutes: number;
+  avg_late_minutes: number | null; // 지각한 날들의 평균 지각 시간
 
   // 내용
   discussion_count: number; // 작성한 발제 문항 총합
@@ -86,6 +94,7 @@ export interface StatsData {
   schedules: Row[];
   pastSchedules: Row[];
   attendances: Row[];
+  arrivals: Row[];
   submissions: Row[];
   books: Row[];
   boardPosts: Row[];
@@ -122,6 +131,7 @@ export async function loadStatsData(): Promise<StatsData> {
     profiles,
     schedules,
     attendances,
+    arrivals,
     submissions,
     books,
     boardPosts,
@@ -131,8 +141,13 @@ export async function loadStatsData(): Promise<StatsData> {
     submissionComments,
   ] = await Promise.all([
     safeSelect(admin, 'profiles', 'id, name, avatar_url, role, created_at'),
-    safeSelect(admin, 'schedules', 'id, title, meeting_date, presenter_id, selected_book_id'),
+    safeSelect(
+      admin,
+      'schedules',
+      'id, title, meeting_date, meeting_time, presenter_id, selected_book_id'
+    ),
     safeSelect(admin, 'attendances', 'schedule_id, user_id, status'),
+    safeSelect(admin, 'meeting_arrivals', 'schedule_id, user_id, status, arrived_at'),
     safeSelect(admin, 'meeting_submissions', 'schedule_id, user_id, discussion, one_liner, rating'),
     safeSelect(admin, 'books', 'id, title, author, cover_url, category, created_by, status'),
     safeSelect(admin, 'board_posts', 'user_id, created_at'),
@@ -152,6 +167,7 @@ export async function loadStatsData(): Promise<StatsData> {
     schedules,
     pastSchedules,
     attendances,
+    arrivals,
     submissions,
     books,
     boardPosts,
@@ -244,6 +260,44 @@ export function buildMemberSummaries(data: StatsData): {
     addParticipation(a.user_id as string, a.schedule_id as string);
   }
 
+  // 출결 기록. '참석'으로 기록됐다면 제출물이 없어도 참여로 인정한다.
+  const scheduleTime = new Map(
+    data.schedules.map((s) => [s.id as string, (s.meeting_time as string | null) ?? null])
+  );
+  const arrivalStats = new Map<
+    string,
+    { on_time: number; late: number; absent: number; lateMinutes: number }
+  >();
+
+  // 명시적으로 '불참'이라 기록된 (사람, 모임) 조합.
+  // 발제·한줄평은 모임 전에 미리 쓰는 것이라 제출물이 있어도 불참일 수 있다.
+  // 사람이 직접 남긴 불참 기록이 더 정확하므로, 마지막에 참여에서 빼준다.
+  const absentKeys = new Set<string>();
+
+  for (const a of data.arrivals) {
+    const scheduleId = a.schedule_id as string;
+    if (!pastScheduleIds.has(scheduleId)) continue;
+    const uid = a.user_id as string;
+    if (!uid) continue;
+
+    const cur = arrivalStats.get(uid) ?? { on_time: 0, late: 0, absent: 0, lateMinutes: 0 };
+    if (a.status === 'absent') {
+      cur.absent += 1;
+      absentKeys.add(`${uid}:${scheduleId}`);
+    } else {
+      addParticipation(uid, scheduleId);
+      const late = getLateMinutes(scheduleTime.get(scheduleId), a.arrived_at as string | null);
+      if (late !== null) {
+        cur.late += 1;
+        cur.lateMinutes += late;
+      } else if (parseTimeToMinutes(a.arrived_at as string | null) !== null) {
+        // 도착 시각이 있고 지각이 아니면 정시
+        cur.on_time += 1;
+      }
+    }
+    arrivalStats.set(uid, cur);
+  }
+
   const discussionCounts = new Map<string, number>();
   const oneLinerCounts = new Map<string, number>();
   const ratingSums = new Map<string, number>();
@@ -270,6 +324,12 @@ export function buildMemberSummaries(data: StatsData): {
     }
   }
 
+  // 불참으로 기록된 모임은 참여에서 제외한다.
+  for (const key of absentKeys) {
+    const [uid, scheduleId] = key.split(':');
+    participatedByUser.get(uid)?.delete(scheduleId);
+  }
+
   // 각 멤버의 활동 시작 시점. profiles.created_at 은 카카오로 나중에 계정이 만들어진
   // 경우 실제 합류보다 늦을 수 있으므로, 첫 참여 모임이 더 이르면 그 쪽을 쓴다.
   const activeSince = new Map<string, number>();
@@ -291,6 +351,7 @@ export function buildMemberSummaries(data: StatsData): {
     const attendable = data.pastSchedules.filter((s) => inRange(s.id as string)).length;
     const participated = [...(participatedByUser.get(id) ?? [])].filter(inRange).length;
     const ratingCount = ratingCounts.get(id) ?? 0;
+    const arrival = arrivalStats.get(id) ?? { on_time: 0, late: 0, absent: 0, lateMinutes: 0 };
 
     const board_post_count = boardCounts.get(id) ?? 0;
     const comment_count = commentCounts.get(id) ?? 0;
@@ -308,6 +369,13 @@ export function buildMemberSummaries(data: StatsData): {
       attendable,
       participated,
       presenter_count: presenterCounts.get(id) ?? 0,
+
+      on_time_count: arrival.on_time,
+      late_count: arrival.late,
+      absent_count: arrival.absent,
+      total_late_minutes: arrival.lateMinutes,
+      avg_late_minutes:
+        arrival.late > 0 ? Math.round(arrival.lateMinutes / arrival.late) : null,
 
       discussion_count,
       one_liner_count: oneLinerCounts.get(id) ?? 0,
