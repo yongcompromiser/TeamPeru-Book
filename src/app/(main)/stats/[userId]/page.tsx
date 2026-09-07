@@ -21,7 +21,9 @@ import {
   MessageSquare,
   Calendar,
   ThumbsUp,
+  Tag,
 } from 'lucide-react';
+import { CategoryDistribution } from '@/components/features/category-distribution';
 import type { MemberDetail, ReadBook } from '@/lib/stats';
 
 function StatTile({
@@ -105,7 +107,15 @@ function BookRow({ book }: { book: ReadBook }) {
             {format(new Date(book.meeting_date), 'yyyy.MM.dd')}
           </span>
         </div>
-        {book.author && <p className="text-xs text-gray-500 -mt-1">{book.author}</p>}
+        <div className="flex items-center gap-2 -mt-1">
+          {book.author && <p className="text-xs text-gray-500 truncate">{book.author}</p>}
+          {book.category && (
+            <span className="inline-flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium bg-stone-100 text-stone-700">
+              <Tag className="w-2.5 h-2.5" />
+              {book.category}
+            </span>
+          )}
+        </div>
 
         {book.rating ? (
           <Stars rating={book.rating} />
@@ -208,7 +218,7 @@ export default function MemberStatsPage() {
     );
   }
 
-  const { summary: s, monthly, rating_distribution, books, presented } = detail;
+  const { summary: s, monthly, rating_distribution, categories, books, presented } = detail;
   const maxDist = Math.max(1, ...rating_distribution.map((d) => d.count));
   const comment = ratingComment(s.avg_rating);
 
@@ -303,6 +313,21 @@ export default function MemberStatsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* 이 멤버가 읽은 분야 */}
+      {categories.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-500" />
+              읽은 분야
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CategoryDistribution categories={categories} />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* 별점 분포 */}

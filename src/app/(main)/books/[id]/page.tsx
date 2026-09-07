@@ -9,6 +9,7 @@ import { ArrowLeft, BookOpen, Tag, User, Pencil, Check, X, Loader2, Trash2 } fro
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { BOOK_STATUS_LABELS } from '@/types';
+import { BOOK_CATEGORIES } from '@/lib/book-category';
 import { Avatar } from '@/components/ui/avatar';
 
 interface PageProps {
@@ -25,6 +26,7 @@ export default function BookDetailPage({ params }: PageProps) {
   const [reasonInput, setReasonInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   useEffect(() => {
     fetchBook();
@@ -65,6 +67,27 @@ export default function BookDetailPage({ params }: PageProps) {
       console.error('Failed to save:', e);
     }
     setIsSaving(false);
+  };
+
+  // 분야는 등록 시 자동 추천된 값이라 틀릴 수 있으므로 누구나 바로 고칠 수 있게 한다.
+  const handleChangeCategory = async (category: string) => {
+    setIsSavingCategory(true);
+    try {
+      const res = await fetch('/api/books', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, category }),
+      });
+      if (res.ok) {
+        setBook({ ...book, category: category || null });
+      } else {
+        alert('분야 변경에 실패했습니다.');
+      }
+    } catch (e) {
+      console.error('Failed to save category:', e);
+      alert('분야 변경에 실패했습니다.');
+    }
+    setIsSavingCategory(false);
   };
 
   const canDelete = book && (book.created_by === user?.id || profile?.role === 'admin');
@@ -147,12 +170,23 @@ export default function BookDetailPage({ params }: PageProps) {
 
               <p className="text-lg text-gray-600 mt-1">{book.author}</p>
 
-              {book.category && (
-                <div className="flex items-center gap-1 mt-3 text-sm text-gray-600">
-                  <Tag className="w-4 h-4" />
-                  <span>{book.category}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 mt-3 text-sm text-gray-600">
+                <Tag className="w-4 h-4 shrink-0" />
+                <select
+                  value={book.category || ''}
+                  disabled={isSavingCategory}
+                  onChange={(e) => handleChangeCategory(e.target.value)}
+                  className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  <option value="">분야 없음</option>
+                  {BOOK_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                {isSavingCategory && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+              </div>
 
               {book.created_by_profile && (
                 <div className="flex items-center gap-1 mt-2 text-sm text-gray-500">

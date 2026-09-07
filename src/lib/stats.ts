@@ -39,11 +39,44 @@ export interface MemberSummary {
   activity_score: number; // 정렬용 종합 활동량
 }
 
+export interface CategorySlice {
+  category: string; // 분야명 또는 '미분류'
+  count: number;
+  percent: number; // 0~100, 반올림
+}
+
 export interface OverallSummary {
   member_count: number;
   meeting_count: number; // 지난 모임 수
   book_count: number; // 함께 읽은 책 수
   total_attendance: number;
+  categories: CategorySlice[]; // 함께 읽은 책의 분야 분포 (많은 순)
+}
+
+const UNCATEGORIZED = '미분류';
+
+// 책 목록 → 분야 분포. 같은 책이 여러 번 선정돼도 읽은 횟수만큼 센다.
+export function buildCategoryDistribution(categories: (string | null | undefined)[]): CategorySlice[] {
+  const counts = new Map<string, number>();
+  for (const c of categories) {
+    const key = c && c.trim().length > 0 ? c : UNCATEGORIZED;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const total = categories.length;
+  if (total === 0) return [];
+
+  return [...counts.entries()]
+    .map(([category, count]) => ({
+      category,
+      count,
+      percent: Math.round((count / total) * 100),
+    }))
+    .sort((a, b) => {
+      // 미분류는 항상 마지막으로 보낸다
+      if (a.category === UNCATEGORIZED) return 1;
+      if (b.category === UNCATEGORIZED) return -1;
+      return b.count - a.count;
+    });
 }
 
 type Row = Record<string, unknown>;
@@ -101,7 +134,7 @@ export async function loadStatsData(): Promise<StatsData> {
     safeSelect(admin, 'schedules', 'id, title, meeting_date, presenter_id, selected_book_id'),
     safeSelect(admin, 'attendances', 'schedule_id, user_id, status'),
     safeSelect(admin, 'meeting_submissions', 'schedule_id, user_id, discussion, one_liner, rating'),
-    safeSelect(admin, 'books', 'id, title, author, cover_url, created_by, status'),
+    safeSelect(admin, 'books', 'id, title, author, cover_url, category, created_by, status'),
     safeSelect(admin, 'board_posts', 'user_id, created_at'),
     safeSelect(admin, 'comments', 'user_id'),
     safeSelect(admin, 'meeting_comments', 'user_id'),
@@ -298,11 +331,21 @@ export function buildMemberSummaries(data: StatsData): {
     };
   });
 
+  // 함께 읽은 책의 분야 분포. 모임 단위로 세어, 같은 책을 두 번 읽으면 두 번 센다.
+  const bookCategory = new Map(
+    data.books.map((b) => [b.id as string, (b.category as string | null) ?? null])
+  );
+  const readCategories = data.pastSchedules
+    .map((s) => s.selected_book_id as string | null)
+    .filter(Boolean)
+    .map((id) => bookCategory.get(id as string) ?? null);
+
   const overall: OverallSummary = {
     member_count: members.length,
     meeting_count: data.pastSchedules.length,
     book_count: readBookIds.size,
     total_attendance: members.reduce((sum, m) => sum + m.participated, 0),
+    categories: buildCategoryDistribution(readCategories),
   };
 
   return { members, overall };
@@ -321,6 +364,7 @@ export interface ReadBook {
   id: string;
   title: string;
   author: string | null;
+  category: string | null;
   cover_url: string | null;
   meeting_date: string;
   schedule_id: string;
@@ -334,6 +378,7 @@ export interface MemberDetail {
   summary: MemberSummary;
   monthly: MonthlyPoint[];
   rating_distribution: { rating: number; count: number }[];
+  categories: CategorySlice[]; // 이 멤버가 참여한 모임의 책 분야 분포
   books: ReadBook[];
   presented: { schedule_id: string; title: string; meeting_date: string }[];
 }
@@ -410,6 +455,7 @@ export function buildMemberDetail(data: StatsData, summary: MemberSummary): Memb
       id: bookId,
       title: (b.title as string) ?? '',
       author: (b.author as string | null) ?? null,
+      category: (b.category as string | null) ?? null,
       cover_url: (b.cover_url as string | null) ?? null,
       meeting_date: s.meeting_date as string,
       schedule_id: scheduleId,
@@ -433,5 +479,12 @@ export function buildMemberDetail(data: StatsData, summary: MemberSummary): Memb
       meeting_date: s.meeting_date as string,
     }));
 
-  return { summary, monthly, rating_distribution, books, presented };
+  return {
+    summary,
+    monthly,
+    rating_distribution,
+    categories: buildCategoryDistribution(books.map((b) => b.category)),
+    books,
+    presented,
+  };
 }

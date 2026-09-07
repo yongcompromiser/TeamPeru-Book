@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, BookOpen, Settings } from 'lucide-react';
+import { Plus, BookOpen, Settings, Tag } from 'lucide-react';
 import { BookStatus, BOOK_STATUS_LABELS, BOOK_STATUS_COLORS } from '@/types';
+import { BOOK_CATEGORIES } from '@/lib/book-category';
 import { cn } from '@/lib/utils';
 
 interface Book {
@@ -16,6 +17,7 @@ interface Book {
   author: string;
   cover_url?: string;
   status: BookStatus;
+  category?: string | null;
   created_at?: string;
 }
 
@@ -34,6 +36,7 @@ export default function BooksPage() {
   const { profile } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
   const [filter, setFilter] = useState<BookStatus | 'all'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
 
@@ -60,7 +63,7 @@ export default function BooksPage() {
     // API 실패시 직접 호출
     const { data } = await supabase
       .from('books')
-      .select('id, title, author, cover_url, status, created_at')
+      .select('id, title, author, cover_url, status, category, created_at')
       .order('created_at', { ascending: false });
 
     setBooks(data || []);
@@ -81,19 +84,41 @@ export default function BooksPage() {
     setEditingBookId(null);
   };
 
-  const filteredBooks = filter === 'all'
-    ? books
-    : books.filter(book => book.status === filter);
+  const filteredBooks = books.filter((book) => {
+    if (filter !== 'all' && book.status !== filter) return false;
+    if (categoryFilter === 'all') return true;
+    // '분야 없음'은 아직 분류하지 않은 책을 모아보기 위한 항목
+    if (categoryFilter === 'none') return !book.category;
+    return book.category === categoryFilter;
+  });
+
+  // 상태 카운트는 분야 필터를 적용한 뒤 세어야 탭 숫자와 목록이 어긋나지 않는다.
+  const categoryScoped = books.filter((book) => {
+    if (categoryFilter === 'all') return true;
+    if (categoryFilter === 'none') return !book.category;
+    return book.category === categoryFilter;
+  });
 
   const getStatusCounts = () => {
-    const counts: Record<string, number> = { all: books.length };
-    books.forEach(book => {
+    const counts: Record<string, number> = { all: categoryScoped.length };
+    categoryScoped.forEach((book) => {
       counts[book.status] = (counts[book.status] || 0) + 1;
     });
     return counts;
   };
 
   const statusCounts = getStatusCounts();
+
+  // 분야 탭에 붙일 개수는 현재 상태 필터를 반영한다.
+  const statusScoped = filter === 'all' ? books : books.filter((b) => b.status === filter);
+  const categoryCounts = new Map<string, number>();
+  for (const b of statusScoped) {
+    const key = b.category || 'none';
+    categoryCounts.set(key, (categoryCounts.get(key) ?? 0) + 1);
+  }
+  // 실제로 책이 있는 분야만 탭으로 노출한다(빈 분야가 줄줄이 늘어서지 않게).
+  const visibleCategories = BOOK_CATEGORIES.filter((c) => (categoryCounts.get(c) ?? 0) > 0);
+  const uncategorizedCount = categoryCounts.get('none') ?? 0;
 
   if (isLoading) {
     return (
@@ -146,6 +171,53 @@ export default function BooksPage() {
         ))}
       </div>
 
+      {/* 분야 필터 */}
+      {(visibleCategories.length > 0 || uncategorizedCount > 0) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Tag className="w-4 h-4 text-gray-400" />
+          <button
+            onClick={() => setCategoryFilter('all')}
+            className={cn(
+              'px-3 py-1 rounded-full text-xs font-medium transition-all',
+              categoryFilter === 'all'
+                ? 'bg-gray-800 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            )}
+          >
+            전체 분야
+          </button>
+          {visibleCategories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={cn(
+                'px-3 py-1 rounded-full text-xs font-medium transition-all',
+                categoryFilter === cat
+                  ? 'bg-gray-800 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              {cat}
+              <span className="ml-1.5 opacity-70">{categoryCounts.get(cat)}</span>
+            </button>
+          ))}
+          {uncategorizedCount > 0 && (
+            <button
+              onClick={() => setCategoryFilter('none')}
+              className={cn(
+                'px-3 py-1 rounded-full text-xs font-medium transition-all',
+                categoryFilter === 'none'
+                  ? 'bg-gray-800 text-white'
+                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+              )}
+            >
+              분야 없음
+              <span className="ml-1.5 opacity-70">{uncategorizedCount}</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {filteredBooks.length > 0 ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredBooks.map((book) => (
@@ -165,8 +237,8 @@ export default function BooksPage() {
                       </div>
                     )}
 
-                    {/* 상태 배지 */}
-                    <div className="mb-2">
+                    {/* 상태 · 분야 배지 */}
+                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
                       <span className={cn(
                         "inline-flex px-2 py-0.5 rounded-full text-xs font-medium",
                         BOOK_STATUS_COLORS[book.status]?.bg || 'bg-gray-100',
@@ -174,6 +246,12 @@ export default function BooksPage() {
                       )}>
                         {BOOK_STATUS_LABELS[book.status] || book.status}
                       </span>
+                      {book.category && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
+                          <Tag className="w-3 h-3" />
+                          {book.category}
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="font-semibold text-gray-900 truncate">{book.title}</h3>

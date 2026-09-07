@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
+import { CategoryDistribution } from '@/components/features/category-distribution';
 import { cn } from '@/lib/utils';
-import { Shield, Users, Calendar, BookOpen, UserCheck, ArrowUpDown } from 'lucide-react';
+import { Shield, Users, Calendar, BookOpen, UserCheck, ArrowUpDown, Tag } from 'lucide-react';
 import type { MemberSummary, OverallSummary } from '@/lib/stats';
 
 // 표의 각 열. numeric 항목은 우측 정렬 + 헤더 클릭으로 내림차순 정렬한다.
@@ -216,6 +217,20 @@ export default function StatsPage() {
           <OverallCard title="함께 읽은 책" value={overall.book_count} icon={BookOpen} />
           <OverallCard title="누적 참석" value={overall.total_attendance} icon={UserCheck} />
         </div>
+      )}
+
+      {overall && overall.categories.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-500" />
+              우리가 읽은 분야
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CategoryDistribution categories={overall.categories} />
+          </CardContent>
+        </Card>
       )}
 
       {sorted.length === 0 ? (

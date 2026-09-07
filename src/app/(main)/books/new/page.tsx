@@ -12,21 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookSearch } from '@/components/features/book-search';
-import { ArrowLeft } from 'lucide-react';
-
-const BOOK_CATEGORIES = [
-  '문학/소설',
-  '인문학',
-  '사회과학',
-  '자기계발',
-  '경제/경영',
-  '과학',
-  '예술',
-  '역사',
-  '철학',
-  '에세이',
-  '기타',
-];
+import { ArrowLeft, Sparkles } from 'lucide-react';
+import { BOOK_CATEGORIES, suggestCategory } from '@/lib/book-category';
 
 const bookSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요'),
@@ -46,6 +33,7 @@ export default function NewBookPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [autoCategory, setAutoCategory] = useState<string | null>(null);
 
   const {
     register,
@@ -62,6 +50,7 @@ export default function NewBookPage() {
     description?: string;
     coverUrl?: string;
     isbn?: string;
+    publisher?: string;
   }) => {
     setValue('title', book.title);
     setValue('author', book.author);
@@ -71,6 +60,16 @@ export default function NewBookPage() {
       setCoverPreview(book.coverUrl);
     }
     if (book.isbn) setValue('isbn', book.isbn);
+
+    // 분야 자동 추천. 확신이 없으면 비워두고, 어디까지나 추천이라 바꿀 수 있다.
+    const suggested = suggestCategory({
+      title: book.title,
+      author: book.author,
+      publisher: book.publisher,
+      description: book.description,
+    });
+    setValue('category', suggested ?? '');
+    setAutoCategory(suggested);
   };
 
   const onSubmit = async (data: BookFormData) => {
@@ -197,9 +196,15 @@ export default function NewBookPage() {
               <div className="mt-4">
                 <label
                   htmlFor="category"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1"
                 >
                   분야 (선택)
+                  {autoCategory && (
+                    <span className="inline-flex items-center gap-1 text-xs font-normal text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                      <Sparkles className="w-3 h-3" />
+                      자동 추천: {autoCategory} · 맞지 않으면 바꿔주세요
+                    </span>
+                  )}
                 </label>
                 <select
                   id="category"

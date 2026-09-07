@@ -10,6 +10,7 @@ interface NaverBook {
   description: string;
   image: string;
   isbn: string;
+  publisher?: string;
 }
 
 interface BookSearchResult {
@@ -18,6 +19,7 @@ interface BookSearchResult {
   description?: string;
   coverUrl?: string;
   isbn?: string;
+  publisher?: string;
 }
 
 interface BookSearchProps {
@@ -74,6 +76,8 @@ export function BookSearch({ onSelect }: BookSearchProps) {
       description: stripHtml(book.description),
       coverUrl: book.image || undefined,
       isbn: book.isbn?.split(' ')[1] || book.isbn || undefined,
+      // 분야 자동 추천에 쓰인다
+      publisher: book.publisher ? stripHtml(book.publisher) : undefined,
     });
 
     setQuery(stripHtml(book.title));

@@ -71,12 +71,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id, selection_reason, cover_url, isbn } = await request.json();
+    const { id, selection_reason, cover_url, isbn, category } = await request.json();
 
     const updateData: any = {};
     if (selection_reason !== undefined) updateData.selection_reason = selection_reason;
     if (cover_url !== undefined) updateData.cover_url = cover_url;
     if (isbn !== undefined) updateData.isbn = isbn;
+    // 빈 문자열은 '분야 없음'(null)으로 저장한다
+    if (category !== undefined) updateData.category = category || null;
 
     const { error } = await adminClient
       .from('books')
