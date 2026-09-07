@@ -12,6 +12,7 @@ import {
   X,
   MessageCircle,
   BarChart3,
+  Trophy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Profile } from '@/types';
@@ -32,7 +33,10 @@ const menuItems = [
 ];
 
 // 정회원에게만 보이는 메뉴. 게스트/가입대기는 모임 내부 기록이라 제외한다.
-const memberMenuItems = [{ href: '/stats', label: '멤버 통계', icon: BarChart3 }];
+const memberMenuItems = [
+  { href: '/stats', label: '멤버 통계', icon: BarChart3 },
+  { href: '/yearbook', label: '연말결산', icon: Trophy },
+];
 
 const adminMenuItems = [{ href: '/admin', label: '관리자', icon: Settings }];
 

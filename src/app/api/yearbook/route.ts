@@ -1,0 +1,52 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { loadStatsData } from '@/lib/stats';
+import { listYears } from '@/lib/yearbook';
+
+// 결산이 있는 연도 목록. 통계와 같은 기준으로 정회원만 볼 수 있다.
+const VIEWABLE_ROLES = ['member', 'admin'];
+
+export async function GET() {
+  try {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (!profile || !VIEWABLE_ROLES.includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const data = await loadStatsData();
+    const years = listYears(data);
+
+    // 연도별 요약(모임 수)과, 사람이 쓴 결산이 있는지 여부
+    const { data: saved } = await adminClient.from('year_reviews').select('year, title');
+    const savedMap = new Map((saved ?? []).map((r) => [r.year as number, r.title as string | null]));
+
+    const items = years.map((year) => ({
+      year,
+      meeting_count: data.pastSchedules.filter(
+        (s) => new Date(s.meeting_date as string).getFullYear() === year
+      ).length,
+      title: savedMap.get(year) ?? null,
+      has_review: savedMap.has(year),
+    }));
+
+    return NextResponse.json({ years: items });
+  } catch (error) {
+    console.error('Yearbook GET error:', error);
+    return NextResponse.json({ error: '연말결산을 불러오지 못했습니다.' }, { status: 500 });
+  }
+}
