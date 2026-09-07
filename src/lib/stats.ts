@@ -2,10 +2,13 @@
 //
 // 원칙: 테이블별로 한 번씩만 조회한 뒤 메모리에서 그룹핑한다.
 // 멤버마다 쿼리를 도는 N+1 을 피하기 위함 (모임 수십 회 / 멤버 수십 명 규모).
+//
+// 참여 판정은 meeting_submissions 제출 기준이다. attendances(참석 응답)는
+// /schedule/[id] 화면에서만 쓰이고 그 화면이 주 동선에 없어 거의 비어 있다.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-// 통계 대상 역할. guest/pending/visitor 는 모수가 달라 참석률이 왜곡되므로 제외.
+// 통계 대상 역할. guest/pending/visitor 는 모수가 달라 지표가 왜곡되므로 제외.
 const COUNTED_ROLES = ['admin', 'member'];
 
 export interface MemberSummary {
@@ -17,11 +20,8 @@ export interface MemberSummary {
   active_since: string; // 집계 기준 시작일 (가입일과 첫 참여일 중 이른 쪽)
 
   // 참여
-  attendable: number; // 가입 이후 열린 지난 모임 수 (분모)
-  participated: number; // 참여한 모임 수 (제출물 또는 참석 응답)
-  participation_rate: number | null;
-  discussion_submitted: number; // 발제를 실제로 작성한 모임 수
-  discussion_rate: number | null;
+  attendable: number; // 활동 시작 이후 열린 지난 모임 수
+  participated: number; // 참석 횟수
   presenter_count: number; // 발제자로 지명된 횟수
 
   // 내용
@@ -33,13 +33,8 @@ export interface MemberSummary {
   // 기여
   books_registered: number;
   books_selected: number; // 등록한 책이 선정된 횟수
-  review_count: number;
-  recap_count: number;
-  photo_count: number;
   board_post_count: number;
   comment_count: number;
-  schedule_vote_count: number;
-  book_vote_count: number;
 
   activity_score: number; // 정렬용 종합 활동량
 }
@@ -47,7 +42,7 @@ export interface MemberSummary {
 export interface OverallSummary {
   member_count: number;
   meeting_count: number; // 지난 모임 수
-  book_count: number; // 선정되어 읽은 책 수
+  book_count: number; // 함께 읽은 책 수
   total_attendance: number;
 }
 
@@ -59,12 +54,8 @@ export interface StatsData {
   pastSchedules: Row[];
   attendances: Row[];
   submissions: Row[];
-  reviews: Row[];
-  recaps: Row[];
   books: Row[];
   boardPosts: Row[];
-  scheduleVotes: Row[];
-  bookVotes: Row[];
   comments: Row[]; // 4개 댓글 테이블 통합 (user_id 만 사용)
 }
 
@@ -99,12 +90,8 @@ export async function loadStatsData(): Promise<StatsData> {
     schedules,
     attendances,
     submissions,
-    reviews,
-    recaps,
     books,
     boardPosts,
-    scheduleVotes,
-    bookVotes,
     comments,
     meetingComments,
     boardComments,
@@ -114,12 +101,8 @@ export async function loadStatsData(): Promise<StatsData> {
     safeSelect(admin, 'schedules', 'id, title, meeting_date, presenter_id, selected_book_id'),
     safeSelect(admin, 'attendances', 'schedule_id, user_id, status'),
     safeSelect(admin, 'meeting_submissions', 'schedule_id, user_id, discussion, one_liner, rating'),
-    safeSelect(admin, 'reviews', 'user_id, book_id, rating, created_at'),
-    safeSelect(admin, 'recaps', 'user_id, schedule_id, photos'),
-    safeSelect(admin, 'books', 'id, title, cover_url, created_by, status'),
+    safeSelect(admin, 'books', 'id, title, author, cover_url, created_by, status'),
     safeSelect(admin, 'board_posts', 'user_id, created_at'),
-    safeSelect(admin, 'schedule_votes', 'user_id, vote_date'),
-    safeSelect(admin, 'book_votes', 'user_id, book_id, schedule_id'),
     safeSelect(admin, 'comments', 'user_id'),
     safeSelect(admin, 'meeting_comments', 'user_id'),
     safeSelect(admin, 'board_comments', 'user_id'),
@@ -137,28 +120,37 @@ export async function loadStatsData(): Promise<StatsData> {
     pastSchedules,
     attendances,
     submissions,
-    reviews,
-    recaps,
     books,
     boardPosts,
-    scheduleVotes,
-    bookVotes,
     comments: [...comments, ...meetingComments, ...boardComments, ...submissionComments],
   };
 }
 
-// discussion 은 JSON 문자열 배열로 저장된다. 비어있지 않은 항목만 센다.
-export function countDiscussions(raw: unknown): number {
-  if (!raw || typeof raw !== 'string') return 0;
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((d) => typeof d === 'string' && d.trim().length > 0).length;
-    }
-  } catch {
-    // JSON 이 아닌 예전 형식(단일 텍스트)
+// discussion 은 JSON 문자열 배열로 저장된다.
+// 다만 예전 형식(단일 텍스트)이나 이중 인코딩된 값이 섞여 있을 수 있어 관대하게 파싱한다.
+export function parseDiscussions(raw: unknown): string[] {
+  if (raw === null || raw === undefined) return [];
+
+  if (Array.isArray(raw)) {
+    return raw
+      .map((d) => (typeof d === 'string' ? d : typeof d === 'object' && d !== null ? String((d as Record<string, unknown>).text ?? '') : ''))
+      .map((d) => d.trim())
+      .filter((d) => d.length > 0);
   }
-  return raw.trim().length > 0 ? 1 : 0;
+
+  if (typeof raw !== 'string') return [];
+  const text = raw.trim();
+  if (text.length === 0) return [];
+
+  try {
+    const parsed = JSON.parse(text);
+    // 이중 인코딩(문자열이 또 나오는 경우) 한 번 더 풀어준다
+    if (typeof parsed === 'string') return parseDiscussions(parsed);
+    if (Array.isArray(parsed)) return parseDiscussions(parsed);
+  } catch {
+    // JSON 이 아닌 예전 형식 → 통째로 하나의 발제로 본다
+  }
+  return [text];
 }
 
 function countBy(rows: Row[], key = 'user_id'): Map<string, number> {
@@ -192,20 +184,8 @@ export function buildMemberSummaries(data: StatsData): {
   );
 
   const presenterCounts = countBy(data.pastSchedules, 'presenter_id');
-  const reviewCounts = countBy(data.reviews);
-  const recapCounts = countBy(data.recaps);
   const boardCounts = countBy(data.boardPosts);
   const commentCounts = countBy(data.comments);
-  const scheduleVoteCounts = countBy(data.scheduleVotes);
-  const bookVoteCounts = countBy(data.bookVotes);
-
-  const photoCounts = new Map<string, number>();
-  for (const r of data.recaps) {
-    const uid = r.user_id as string | null;
-    if (!uid) continue;
-    const photos = Array.isArray(r.photos) ? r.photos.length : 0;
-    photoCounts.set(uid, (photoCounts.get(uid) ?? 0) + photos);
-  }
 
   const booksRegistered = countBy(data.books, 'created_by');
   const booksSelected = new Map<string, number>();
@@ -217,9 +197,7 @@ export function buildMemberSummaries(data: StatsData): {
     }
   }
 
-  // 참여 판정: 이 앱의 실제 동선은 모임 페이지에서 발제/한줄평/별점을 제출하는 것이고,
-  // attendances(참석 응답)는 /schedule/[id] 화면에서만 쓰여 거의 쌓이지 않는다.
-  // 그래서 '제출물이 있는 모임'을 참여로 보되, 참석 응답이 있으면 그것도 합집합으로 인정한다.
+  // 참여 판정: 제출물이 있는 모임. 참석 응답이 있으면 합집합으로 함께 인정한다.
   const participatedByUser = new Map<string, Set<string>>();
   const addParticipation = (uid: string, scheduleId: string) => {
     const set = participatedByUser.get(uid) ?? new Set<string>();
@@ -233,8 +211,6 @@ export function buildMemberSummaries(data: StatsData): {
     addParticipation(a.user_id as string, a.schedule_id as string);
   }
 
-  // 제출물: 지난 모임 기준으로 집계
-  const discussionByUser = new Map<string, Set<string>>();
   const discussionCounts = new Map<string, number>();
   const oneLinerCounts = new Map<string, number>();
   const ratingSums = new Map<string, number>();
@@ -246,12 +222,9 @@ export function buildMemberSummaries(data: StatsData): {
     if (!uid) continue;
     addParticipation(uid, s.schedule_id as string);
 
-    const discussions = countDiscussions(s.discussion);
-    if (discussions > 0) {
-      const set = discussionByUser.get(uid) ?? new Set<string>();
-      set.add(s.schedule_id as string);
-      discussionByUser.set(uid, set);
-      discussionCounts.set(uid, (discussionCounts.get(uid) ?? 0) + discussions);
+    const discussions = parseDiscussions(s.discussion);
+    if (discussions.length > 0) {
+      discussionCounts.set(uid, (discussionCounts.get(uid) ?? 0) + discussions.length);
     }
     const one = (s.one_liner as string | null) ?? '';
     if (one.trim().length > 0) {
@@ -266,12 +239,10 @@ export function buildMemberSummaries(data: StatsData): {
 
   // 각 멤버의 활동 시작 시점. profiles.created_at 은 카카오로 나중에 계정이 만들어진
   // 경우 실제 합류보다 늦을 수 있으므로, 첫 참여 모임이 더 이르면 그 쪽을 쓴다.
-  // (이렇게 해야 분자가 분모를 넘어 참여율이 100%를 초과하는 일이 없다.)
   const activeSince = new Map<string, number>();
   for (const p of data.profiles) {
     const id = p.id as string;
-    const joinedAt = new Date(p.created_at as string).getTime();
-    let since = joinedAt;
+    let since = new Date(p.created_at as string).getTime();
     for (const scheduleId of participatedByUser.get(id) ?? []) {
       const t = scheduleDate.get(scheduleId);
       if (t !== undefined && t < since) since = t;
@@ -279,29 +250,15 @@ export function buildMemberSummaries(data: StatsData): {
     activeSince.set(id, since);
   }
 
-  // 독후감 별점도 평균에 합산
-  for (const r of data.reviews) {
-    const uid = r.user_id as string;
-    const rating = r.rating as number | null;
-    if (!uid || typeof rating !== 'number' || rating <= 0) continue;
-    ratingSums.set(uid, (ratingSums.get(uid) ?? 0) + rating);
-    ratingCounts.set(uid, (ratingCounts.get(uid) ?? 0) + 1);
-  }
-
   const members: MemberSummary[] = targets.map((p) => {
     const id = p.id as string;
     const since = activeSince.get(id) ?? new Date(p.created_at as string).getTime();
-
-    // 분모는 '활동 시작 이후에 열린 지난 모임'. 늦게 합류한 멤버가 불리해지지 않게 한다.
     const inRange = (scheduleId: string) => (scheduleDate.get(scheduleId) ?? 0) >= since;
 
     const attendable = data.pastSchedules.filter((s) => inRange(s.id as string)).length;
     const participated = [...(participatedByUser.get(id) ?? [])].filter(inRange).length;
-    const discussion_submitted = [...(discussionByUser.get(id) ?? [])].filter(inRange).length;
     const ratingCount = ratingCounts.get(id) ?? 0;
 
-    const review_count = reviewCounts.get(id) ?? 0;
-    const recap_count = recapCounts.get(id) ?? 0;
     const board_post_count = boardCounts.get(id) ?? 0;
     const comment_count = commentCounts.get(id) ?? 0;
     const books_registered = booksRegistered.get(id) ?? 0;
@@ -317,11 +274,6 @@ export function buildMemberSummaries(data: StatsData): {
 
       attendable,
       participated,
-      participation_rate:
-        attendable > 0 ? Math.round((participated / attendable) * 100) : null,
-      discussion_submitted,
-      discussion_rate:
-        attendable > 0 ? Math.round((discussion_submitted / attendable) * 100) : null,
       presenter_count: presenterCounts.get(id) ?? 0,
 
       discussion_count,
@@ -332,21 +284,14 @@ export function buildMemberSummaries(data: StatsData): {
 
       books_registered,
       books_selected: booksSelected.get(id) ?? 0,
-      review_count,
-      recap_count,
-      photo_count: photoCounts.get(id) ?? 0,
       board_post_count,
       comment_count,
-      schedule_vote_count: scheduleVoteCounts.get(id) ?? 0,
-      book_vote_count: bookVoteCounts.get(id) ?? 0,
 
-      // 참여/발제를 크게 보고 나머지 기여를 얹는다
+      // 참석을 크게 보고 나머지 기여를 얹는다
       activity_score:
         participated * 5 +
-        discussion_submitted * 4 +
-        discussion_count +
-        review_count * 3 +
-        recap_count * 3 +
+        discussion_count * 2 +
+        (oneLinerCounts.get(id) ?? 0) +
         board_post_count * 2 +
         comment_count +
         books_registered * 2,
@@ -371,16 +316,18 @@ export interface MonthlyPoint {
   total: number;
 }
 
+// 참여한 모임 1건 = 책 1권. 그 모임에 남긴 내 기록을 함께 담는다.
 export interface ReadBook {
   id: string;
   title: string;
+  author: string | null;
   cover_url: string | null;
   meeting_date: string;
   schedule_id: string;
   schedule_title: string;
-  participated: boolean;
   rating: number | null;
   one_liner: string | null;
+  discussions: string[];
 }
 
 export interface MemberDetail {
@@ -396,10 +343,7 @@ function monthKey(iso: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function buildMemberDetail(
-  data: StatsData,
-  summary: MemberSummary
-): MemberDetail {
+export function buildMemberDetail(data: StatsData, summary: MemberSummary): MemberDetail {
   const userId = summary.id;
   const since = new Date(summary.active_since).getTime();
 
@@ -413,9 +357,7 @@ export function buildMemberDetail(
     );
 
   const mySubmissions = new Map(
-    data.submissions
-      .filter((s) => s.user_id === userId)
-      .map((s) => [s.schedule_id as string, s])
+    data.submissions.filter((s) => s.user_id === userId).map((s) => [s.schedule_id as string, s])
   );
 
   // 요약 지표와 동일한 기준: 제출물이 있거나 참석 응답이 있으면 참여로 본다.
@@ -442,44 +384,39 @@ export function buildMemberDetail(
     ...v,
   }));
 
-  // 별점 분포 (모임 제출 별점 + 독후감 별점)
+  // 별점 분포
   const dist = new Map<number, number>([1, 2, 3, 4, 5].map((n) => [n, 0]));
-  for (const s of data.submissions) {
-    if (s.user_id !== userId) continue;
+  for (const s of mySubmissions.values()) {
     const r = s.rating as number | null;
     if (typeof r === 'number' && r >= 1 && r <= 5) {
       dist.set(Math.round(r), (dist.get(Math.round(r)) ?? 0) + 1);
-    }
-  }
-  for (const r of data.reviews) {
-    if (r.user_id !== userId) continue;
-    const v = r.rating as number | null;
-    if (typeof v === 'number' && v >= 1 && v <= 5) {
-      dist.set(Math.round(v), (dist.get(Math.round(v)) ?? 0) + 1);
     }
   }
   const rating_distribution = [...dist.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([rating, count]) => ({ rating, count }));
 
-  // 함께 읽은 책
+  // 함께 읽은 책 — 참여한 모임만
   const books: ReadBook[] = [];
   for (const s of relevant) {
+    const scheduleId = s.id as string;
+    if (!participatedSet.has(scheduleId)) continue;
     const bookId = s.selected_book_id as string | null;
     if (!bookId) continue;
     const b = bookMap.get(bookId);
     if (!b) continue;
-    const sub = mySubmissions.get(s.id as string);
+    const sub = mySubmissions.get(scheduleId);
     books.push({
       id: bookId,
       title: (b.title as string) ?? '',
+      author: (b.author as string | null) ?? null,
       cover_url: (b.cover_url as string | null) ?? null,
       meeting_date: s.meeting_date as string,
-      schedule_id: s.id as string,
+      schedule_id: scheduleId,
       schedule_title: (s.title as string) ?? '',
-      participated: participatedSet.has(s.id as string),
       rating: (sub?.rating as number | null) ?? null,
       one_liner: (sub?.one_liner as string | null) ?? null,
+      discussions: parseDiscussions(sub?.discussion),
     });
   }
 

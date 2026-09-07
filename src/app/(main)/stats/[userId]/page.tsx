@@ -18,13 +18,11 @@ import {
   Star,
   Mic,
   BookOpen,
-  PenTool,
-  Camera,
   MessageSquare,
   Calendar,
   ThumbsUp,
 } from 'lucide-react';
-import type { MemberDetail } from '@/lib/stats';
+import type { MemberDetail, ReadBook } from '@/lib/stats';
 
 function StatTile({
   label,
@@ -51,13 +49,96 @@ function StatTile({
   );
 }
 
-// 평균 별점이 전체 평균 대비 어느 쪽인지 한 줄로 알려준다.
 function ratingComment(avg: number | null): string | null {
   if (avg === null) return null;
   if (avg >= 4.5) return '별점을 후하게 주는 편이에요';
   if (avg >= 3.5) return '무난하게 주는 편이에요';
   if (avg >= 2.5) return '조금 깐깐한 편이에요';
   return '별점에 인색한 편이에요';
+}
+
+function Stars({ rating }: { rating: number }) {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star
+          key={n}
+          className={cn(
+            'w-3.5 h-3.5',
+            n <= rating ? 'text-amber-500 fill-amber-500' : 'text-gray-200 fill-gray-200'
+          )}
+        />
+      ))}
+      <span className="text-xs text-gray-500 ml-1">{rating}점</span>
+    </span>
+  );
+}
+
+// 책 한 권 = 한 줄. 표지 옆에 그 모임에 남긴 별점·한줄평·발제문을 함께 보여준다.
+function BookRow({ book }: { book: ReadBook }) {
+  return (
+    <div className="flex gap-4 py-4">
+      <Link href={`/meetings/${book.schedule_id}`} className="shrink-0">
+        <div className="w-16 aspect-[2/3] rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+          {book.cover_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center p-1">
+              <span className="text-[10px] text-gray-500 text-center line-clamp-4">
+                {book.title}
+              </span>
+            </div>
+          )}
+        </div>
+      </Link>
+
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="flex items-baseline justify-between gap-3">
+          <Link
+            href={`/meetings/${book.schedule_id}`}
+            className="font-semibold text-gray-900 hover:text-amber-700 truncate"
+          >
+            {book.title}
+          </Link>
+          <span className="text-xs text-gray-400 shrink-0">
+            {format(new Date(book.meeting_date), 'yyyy.MM.dd')}
+          </span>
+        </div>
+        {book.author && <p className="text-xs text-gray-500 -mt-1">{book.author}</p>}
+
+        {book.rating ? (
+          <Stars rating={book.rating} />
+        ) : (
+          <span className="text-xs text-gray-400">별점 없음</span>
+        )}
+
+        {book.one_liner && (
+          <p className="text-sm text-gray-700 bg-amber-50/70 border border-amber-100 rounded-md px-3 py-2">
+            “{book.one_liner}”
+          </p>
+        )}
+
+        {book.discussions.length > 0 ? (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-gray-500">
+              발제문 {book.discussions.length}개
+            </p>
+            <ul className="space-y-1">
+              {book.discussions.map((d, i) => (
+                <li key={i} className="flex gap-2 text-sm text-gray-700">
+                  <span className="text-gray-400 shrink-0">{i + 1}.</span>
+                  <span className="whitespace-pre-wrap">{d}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">발제문 없음</p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function MemberStatsPage() {
@@ -150,7 +231,7 @@ export default function MemberStatsPage() {
             {s.role === 'admin' && <Badge variant="info">관리자</Badge>}
           </div>
           <p className="text-sm text-gray-500">
-            {format(new Date(s.joined_at), 'yyyy년 M월 d일', { locale: ko })} 합류 · 가입 이후 모임{' '}
+            {format(new Date(s.joined_at), 'yyyy년 M월 d일', { locale: ko })} 합류 · 대상 모임{' '}
             {s.attendable}회
           </p>
         </div>
@@ -159,15 +240,15 @@ export default function MemberStatsPage() {
       {/* 핵심 지표 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile
-          label="참여율"
-          value={s.participation_rate === null ? '-' : `${s.participation_rate}%`}
-          sub={`${s.participated} / ${s.attendable}회`}
+          label="참석"
+          value={`${s.participated}회`}
+          sub={`대상 모임 ${s.attendable}회`}
           icon={UserCheck}
         />
         <StatTile
-          label="발제 작성률"
-          value={s.discussion_rate === null ? '-' : `${s.discussion_rate}%`}
-          sub={`${s.discussion_submitted} / ${s.attendable}회`}
+          label="발제 문항"
+          value={`${s.discussion_count}개`}
+          sub={`한줄평 ${s.one_liner_count}회`}
           icon={FileText}
         />
         <StatTile
@@ -179,12 +260,11 @@ export default function MemberStatsPage() {
         <StatTile
           label="발제자 담당"
           value={`${s.presenter_count}회`}
-          sub={`발제 문항 ${s.discussion_count}개 작성`}
           icon={Mic}
         />
       </div>
 
-      {/* 월별 참석 추이 */}
+      {/* 월별 참여 추이 */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -208,11 +288,7 @@ export default function MemberStatsPage() {
                       <div
                         className={cn(
                           'w-full rounded-md transition-all',
-                          ratio >= 0.8
-                            ? 'bg-green-400'
-                            : ratio > 0
-                              ? 'bg-amber-400'
-                              : 'bg-gray-200'
+                          ratio >= 0.8 ? 'bg-green-400' : ratio > 0 ? 'bg-amber-400' : 'bg-gray-200'
                         )}
                         style={{ height: `${Math.max(ratio * 100, ratio > 0 ? 8 : 3)}%` }}
                       />
@@ -269,7 +345,7 @@ export default function MemberStatsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <dl className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
                 <dt className="flex items-center gap-1.5 text-gray-600">
                   <BookOpen className="w-4 h-4 text-gray-400" />책 등록
@@ -279,25 +355,6 @@ export default function MemberStatsPage() {
                   {s.books_selected > 0 && (
                     <span className="text-xs font-normal text-amber-600 ml-1">
                       (선정 {s.books_selected})
-                    </span>
-                  )}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="flex items-center gap-1.5 text-gray-600">
-                  <PenTool className="w-4 h-4 text-gray-400" />독후감
-                </dt>
-                <dd className="font-semibold text-gray-900">{s.review_count}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="flex items-center gap-1.5 text-gray-600">
-                  <Camera className="w-4 h-4 text-gray-400" />모임 후기
-                </dt>
-                <dd className="font-semibold text-gray-900">
-                  {s.recap_count}
-                  {s.photo_count > 0 && (
-                    <span className="text-xs font-normal text-gray-400 ml-1">
-                      (사진 {s.photo_count})
                     </span>
                   )}
                 </dd>
@@ -315,14 +372,6 @@ export default function MemberStatsPage() {
               <div className="flex items-center justify-between">
                 <dt className="text-gray-600">한줄평</dt>
                 <dd className="font-semibold text-gray-900">{s.one_liner_count}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-gray-600">일정 투표</dt>
-                <dd className="font-semibold text-gray-900">{s.schedule_vote_count}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-gray-600">책 투표</dt>
-                <dd className="font-semibold text-gray-900">{s.book_vote_count}</dd>
               </div>
             </dl>
           </CardContent>
@@ -358,7 +407,7 @@ export default function MemberStatsPage() {
         </Card>
       )}
 
-      {/* 함께 읽은 책 */}
+      {/* 함께 읽은 책 — 참여한 모임만, 책 한 권당 한 줄 */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -368,51 +417,13 @@ export default function MemberStatsPage() {
         </CardHeader>
         <CardContent>
           {books.length === 0 ? (
-            <p className="text-sm text-gray-500 py-4 text-center">아직 기록이 없습니다.</p>
+            <p className="text-sm text-gray-500 py-4 text-center">참여한 모임이 없습니다.</p>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
+            <div className="divide-y divide-gray-100">
               {books.map((b) => (
-                <Link
-                  key={`${b.schedule_id}-${b.id}`}
-                  href={`/meetings/${b.schedule_id}`}
-                  className="group"
-                >
-                  <div
-                    className={cn(
-                      'aspect-[2/3] rounded-md overflow-hidden bg-gray-100 border transition-all',
-                      b.participated
-                        ? 'border-amber-300'
-                        : 'border-gray-200 opacity-50 grayscale group-hover:opacity-80'
-                    )}
-                  >
-                    {b.cover_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={b.cover_url}
-                        alt={b.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center p-1">
-                        <span className="text-[10px] text-gray-500 text-center line-clamp-4">
-                          {b.title}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-gray-600 mt-1 truncate">{b.title}</p>
-                  <p className="text-[10px] text-gray-400">
-                    {b.participated ? '참여' : '미참여'}
-                    {b.rating ? ` · ${b.rating}점` : ''}
-                  </p>
-                </Link>
+                <BookRow key={`${b.schedule_id}-${b.id}`} book={b} />
               ))}
             </div>
-          )}
-          {books.length > 0 && (
-            <p className="text-[11px] text-gray-400 mt-4">
-              흐리게 표시된 책은 제출물을 남기지 않은 모임입니다.
-            </p>
           )}
         </CardContent>
       </Card>

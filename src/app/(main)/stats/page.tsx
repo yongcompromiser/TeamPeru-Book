@@ -1,60 +1,105 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import {
-  Shield,
-  Users,
-  Calendar,
-  BookOpen,
-  UserCheck,
-  ChevronRight,
-  Star,
-  Mic,
-} from 'lucide-react';
+import { Shield, Users, Calendar, BookOpen, UserCheck, ArrowUpDown } from 'lucide-react';
 import type { MemberSummary, OverallSummary } from '@/lib/stats';
 
-type SortKey = 'activity' | 'attend' | 'submit' | 'rating' | 'joined';
+// 표의 각 열. numeric 항목은 우측 정렬 + 헤더 클릭으로 내림차순 정렬한다.
+type ColumnKey =
+  | 'name'
+  | 'participated'
+  | 'presenter_count'
+  | 'discussion_count'
+  | 'one_liner_count'
+  | 'avg_rating'
+  | 'books_registered'
+  | 'board_post_count'
+  | 'comment_count'
+  | 'activity_score';
 
-const sortOptions: { key: SortKey; label: string }[] = [
-  { key: 'activity', label: '활동량' },
-  { key: 'attend', label: '참여율' },
-  { key: 'submit', label: '발제 작성률' },
-  { key: 'rating', label: '평균 별점' },
-  { key: 'joined', label: '가입순' },
+interface Column {
+  key: ColumnKey;
+  label: string;
+  hint?: string;
+  render: (m: MemberSummary) => React.ReactNode;
+  value: (m: MemberSummary) => number;
+}
+
+const columns: Column[] = [
+  {
+    key: 'participated',
+    label: '참석',
+    hint: '참석한 모임 횟수',
+    render: (m) => `${m.participated}회`,
+    value: (m) => m.participated,
+  },
+  {
+    key: 'presenter_count',
+    label: '발제자',
+    hint: '발제자를 맡은 횟수',
+    render: (m) => `${m.presenter_count}회`,
+    value: (m) => m.presenter_count,
+  },
+  {
+    key: 'discussion_count',
+    label: '발제 문항',
+    hint: '작성한 발제 문항 총합',
+    render: (m) => m.discussion_count,
+    value: (m) => m.discussion_count,
+  },
+  {
+    key: 'one_liner_count',
+    label: '한줄평',
+    hint: '한줄평을 남긴 모임 수',
+    render: (m) => m.one_liner_count,
+    value: (m) => m.one_liner_count,
+  },
+  {
+    key: 'avg_rating',
+    label: '평균 별점',
+    hint: '모임에서 매긴 별점의 평균',
+    render: (m) => (m.avg_rating === null ? '-' : m.avg_rating.toFixed(1)),
+    value: (m) => m.avg_rating ?? -1,
+  },
+  {
+    key: 'books_registered',
+    label: '책 등록',
+    hint: '등록한 책 수 (괄호는 선정된 수)',
+    render: (m) => (
+      <>
+        {m.books_registered}
+        {m.books_selected > 0 && (
+          <span className="text-amber-600 text-xs ml-1">({m.books_selected})</span>
+        )}
+      </>
+    ),
+    value: (m) => m.books_registered,
+  },
+  {
+    key: 'board_post_count',
+    label: '게시글',
+    render: (m) => m.board_post_count,
+    value: (m) => m.board_post_count,
+  },
+  {
+    key: 'comment_count',
+    label: '댓글',
+    render: (m) => m.comment_count,
+    value: (m) => m.comment_count,
+  },
+  {
+    key: 'activity_score',
+    label: '활동량',
+    hint: '참석·발제·한줄평·게시글·댓글·책등록을 가중 합산한 값',
+    render: (m) => m.activity_score,
+    value: (m) => m.activity_score,
+  },
 ];
-
-function sortMembers(members: MemberSummary[], key: SortKey): MemberSummary[] {
-  const sorted = [...members];
-  switch (key) {
-    case 'attend':
-      return sorted.sort(
-        (a, b) => (b.participation_rate ?? -1) - (a.participation_rate ?? -1)
-      );
-    case 'submit':
-      return sorted.sort((a, b) => (b.discussion_rate ?? -1) - (a.discussion_rate ?? -1));
-    case 'rating':
-      return sorted.sort((a, b) => (b.avg_rating ?? -1) - (a.avg_rating ?? -1));
-    case 'joined':
-      return sorted.sort(
-        (a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime()
-      );
-    default:
-      return sorted.sort((a, b) => b.activity_score - a.activity_score);
-  }
-}
-
-function rateColor(rate: number | null): string {
-  if (rate === null) return 'text-gray-400';
-  if (rate >= 80) return 'text-green-600';
-  if (rate >= 50) return 'text-amber-600';
-  return 'text-gray-500';
-}
 
 function OverallCard({
   title,
@@ -80,34 +125,14 @@ function OverallCard({
   );
 }
 
-// 비율 막대. 분모가 0이면(가입 직후 등) 값 대신 '-' 를 보여준다.
-function RateBar({ label, rate, detail }: { label: string; rate: number | null; detail: string }) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between mb-1">
-        <span className="text-xs text-gray-500">{label}</span>
-        <span className={cn('text-sm font-semibold', rateColor(rate))}>
-          {rate === null ? '-' : `${rate}%`}
-        </span>
-      </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-amber-400 rounded-full transition-all"
-          style={{ width: `${rate ?? 0}%` }}
-        />
-      </div>
-      <p className="text-[11px] text-gray-400 mt-1">{detail}</p>
-    </div>
-  );
-}
-
 export default function StatsPage() {
+  const router = useRouter();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
 
   const [members, setMembers] = useState<MemberSummary[]>([]);
   const [overall, setOverall] = useState<OverallSummary | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>('activity');
+  const [sortKey, setSortKey] = useState<ColumnKey>('activity_score');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -166,15 +191,21 @@ export default function StatsPage() {
     );
   }
 
-  const sorted = sortMembers(members, sortKey);
+  const sorted =
+    sortKey === 'name'
+      ? [...members].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+      : [...members].sort((a, b) => {
+          const col = columns.find((c) => c.key === sortKey);
+          return col ? col.value(b) - col.value(a) : 0;
+        });
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">멤버 통계</h1>
         <p className="text-sm text-gray-500 mt-1">
-          지난 모임 기준입니다. 참여는 모임 페이지에 발제·한줄평·별점 중 하나라도 제출한 경우로
-          집계하며, 분모는 각 멤버가 가입한 이후에 열린 모임 수입니다.
+          지난 모임 기준입니다. 참석은 모임 페이지에 발제·한줄평·별점 중 하나라도 제출한 경우로
+          집계합니다. 열 제목을 누르면 정렬되고, 이름을 누르면 상세로 이동합니다.
         </p>
       </div>
 
@@ -183,27 +214,9 @@ export default function StatsPage() {
           <OverallCard title="멤버" value={overall.member_count} icon={Users} />
           <OverallCard title="지난 모임" value={overall.meeting_count} icon={Calendar} />
           <OverallCard title="함께 읽은 책" value={overall.book_count} icon={BookOpen} />
-          <OverallCard title="누적 참여" value={overall.total_attendance} icon={UserCheck} />
+          <OverallCard title="누적 참석" value={overall.total_attendance} icon={UserCheck} />
         </div>
       )}
-
-      {/* 정렬 */}
-      <div className="flex flex-wrap gap-2">
-        {sortOptions.map((opt) => (
-          <button
-            key={opt.key}
-            onClick={() => setSortKey(opt.key)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-              sortKey === opt.key
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
 
       {sorted.length === 0 ? (
         <Card>
@@ -212,52 +225,85 @@ export default function StatsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sorted.map((m) => (
-            <Link key={m.id} href={`/stats/${m.id}`}>
-              <Card className="h-full hover:border-amber-300 hover:shadow-md transition-all">
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Avatar src={m.avatar_url} name={m.name} size="md" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-gray-900 truncate">{m.name}</p>
-                        {m.role === 'admin' && <Badge variant="info">관리자</Badge>}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        활동량 {m.activity_score}
-                      </p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
-                  </div>
-
-                  <RateBar
-                    label="참여율"
-                    rate={m.participation_rate}
-                    detail={`${m.participated} / ${m.attendable}회`}
-                  />
-                  <RateBar
-                    label="발제 작성률"
-                    rate={m.discussion_rate}
-                    detail={`${m.discussion_submitted} / ${m.attendable}회`}
-                  />
-
-                  <div className="flex items-center gap-4 pt-1 border-t border-gray-100 text-xs text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <Star className="w-3.5 h-3.5 text-amber-500" />
-                      {m.avg_rating === null ? '-' : m.avg_rating.toFixed(1)}
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  {/* 멤버 열은 가로 스크롤 시에도 고정 */}
+                  <th
+                    onClick={() => setSortKey('name')}
+                    className={cn(
+                      'sticky left-0 z-10 bg-gray-50 text-left font-medium px-4 py-3 whitespace-nowrap cursor-pointer select-none border-r border-gray-200',
+                      sortKey === 'name' ? 'text-amber-700' : 'text-gray-600 hover:text-gray-900'
+                    )}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      멤버
+                      <ArrowUpDown className="w-3 h-3 opacity-50" />
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Mic className="w-3.5 h-3.5 text-gray-400" />
-                      발제자 {m.presenter_count}회
-                    </span>
-                    <span className="ml-auto text-gray-400">댓글 {m.comment_count}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                  </th>
+                  {columns.map((col) => (
+                    <th
+                      key={col.key}
+                      title={col.hint}
+                      onClick={() => setSortKey(col.key)}
+                      className={cn(
+                        'text-right font-medium px-4 py-3 whitespace-nowrap cursor-pointer select-none',
+                        sortKey === col.key
+                          ? 'text-amber-700'
+                          : 'text-gray-600 hover:text-gray-900'
+                      )}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        <ArrowUpDown className="w-3 h-3 opacity-50" />
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((m, idx) => (
+                  <tr
+                    key={m.id}
+                    onClick={() => router.push(`/stats/${m.id}`)}
+                    className={cn(
+                      'border-b border-gray-100 cursor-pointer hover:bg-amber-50/60 transition-colors',
+                      idx % 2 === 1 && 'bg-gray-50/50'
+                    )}
+                  >
+                    <td
+                      className={cn(
+                        'sticky left-0 z-10 px-4 py-3 whitespace-nowrap border-r border-gray-200',
+                        idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Avatar src={m.avatar_url} name={m.name} size="xs" />
+                        <span className="font-medium text-gray-900">{m.name}</span>
+                        {m.role === 'admin' && (
+                          <span className="text-[10px] text-blue-600">관리자</span>
+                        )}
+                      </span>
+                    </td>
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
+                        className={cn(
+                          'px-4 py-3 text-right tabular-nums whitespace-nowrap',
+                          sortKey === col.key ? 'text-gray-900 font-semibold' : 'text-gray-700'
+                        )}
+                      >
+                        {col.render(m)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );
