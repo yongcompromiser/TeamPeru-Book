@@ -11,6 +11,7 @@ import {
   Users,
   X,
   MessageCircle,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Profile } from '@/types';
@@ -31,6 +32,7 @@ const menuItems = [
 ];
 
 const adminMenuItems = [
+  { href: '/stats', label: '멤버 통계', icon: BarChart3 },
   { href: '/admin', label: '관리자', icon: Settings },
 ];
 
