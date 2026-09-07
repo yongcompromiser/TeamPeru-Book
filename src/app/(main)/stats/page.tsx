@@ -23,8 +23,8 @@ type SortKey = 'activity' | 'attend' | 'submit' | 'rating' | 'joined';
 
 const sortOptions: { key: SortKey; label: string }[] = [
   { key: 'activity', label: '활동량' },
-  { key: 'attend', label: '참석률' },
-  { key: 'submit', label: '발제 제출률' },
+  { key: 'attend', label: '참여율' },
+  { key: 'submit', label: '발제 작성률' },
   { key: 'rating', label: '평균 별점' },
   { key: 'joined', label: '가입순' },
 ];
@@ -33,9 +33,11 @@ function sortMembers(members: MemberSummary[], key: SortKey): MemberSummary[] {
   const sorted = [...members];
   switch (key) {
     case 'attend':
-      return sorted.sort((a, b) => (b.attend_rate ?? -1) - (a.attend_rate ?? -1));
+      return sorted.sort(
+        (a, b) => (b.participation_rate ?? -1) - (a.participation_rate ?? -1)
+      );
     case 'submit':
-      return sorted.sort((a, b) => (b.submit_rate ?? -1) - (a.submit_rate ?? -1));
+      return sorted.sort((a, b) => (b.discussion_rate ?? -1) - (a.discussion_rate ?? -1));
     case 'rating':
       return sorted.sort((a, b) => (b.avg_rating ?? -1) - (a.avg_rating ?? -1));
     case 'joined':
@@ -171,7 +173,8 @@ export default function StatsPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">멤버 통계</h1>
         <p className="text-sm text-gray-500 mt-1">
-          지난 모임 기준입니다. 참석률·제출률의 분모는 각 멤버가 가입한 이후에 열린 모임 수입니다.
+          지난 모임 기준입니다. 참여는 모임 페이지에 발제·한줄평·별점 중 하나라도 제출한 경우로
+          집계하며, 분모는 각 멤버가 가입한 이후에 열린 모임 수입니다.
         </p>
       </div>
 
@@ -180,7 +183,7 @@ export default function StatsPage() {
           <OverallCard title="멤버" value={overall.member_count} icon={Users} />
           <OverallCard title="지난 모임" value={overall.meeting_count} icon={Calendar} />
           <OverallCard title="함께 읽은 책" value={overall.book_count} icon={BookOpen} />
-          <OverallCard title="누적 참석" value={overall.total_attendance} icon={UserCheck} />
+          <OverallCard title="누적 참여" value={overall.total_attendance} icon={UserCheck} />
         </div>
       )}
 
@@ -229,14 +232,14 @@ export default function StatsPage() {
                   </div>
 
                   <RateBar
-                    label="참석률"
-                    rate={m.attend_rate}
-                    detail={`${m.attended} / ${m.attendable}회`}
+                    label="참여율"
+                    rate={m.participation_rate}
+                    detail={`${m.participated} / ${m.attendable}회`}
                   />
                   <RateBar
-                    label="발제 제출률"
-                    rate={m.submit_rate}
-                    detail={`${m.submitted} / ${m.attendable}회`}
+                    label="발제 작성률"
+                    rate={m.discussion_rate}
+                    detail={`${m.discussion_submitted} / ${m.attendable}회`}
                   />
 
                   <div className="flex items-center gap-4 pt-1 border-t border-gray-100 text-xs text-gray-600">

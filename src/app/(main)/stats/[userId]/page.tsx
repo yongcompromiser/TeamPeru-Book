@@ -159,15 +159,15 @@ export default function MemberStatsPage() {
       {/* 핵심 지표 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile
-          label="참석률"
-          value={s.attend_rate === null ? '-' : `${s.attend_rate}%`}
-          sub={`${s.attended} / ${s.attendable}회`}
+          label="참여율"
+          value={s.participation_rate === null ? '-' : `${s.participation_rate}%`}
+          sub={`${s.participated} / ${s.attendable}회`}
           icon={UserCheck}
         />
         <StatTile
-          label="발제 제출률"
-          value={s.submit_rate === null ? '-' : `${s.submit_rate}%`}
-          sub={`${s.submitted} / ${s.attendable}회`}
+          label="발제 작성률"
+          value={s.discussion_rate === null ? '-' : `${s.discussion_rate}%`}
+          sub={`${s.discussion_submitted} / ${s.attendable}회`}
           icon={FileText}
         />
         <StatTile
@@ -189,7 +189,7 @@ export default function MemberStatsPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Calendar className="w-4 h-4 text-gray-500" />
-            월별 참석 추이
+            월별 참여 추이
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -198,11 +198,11 @@ export default function MemberStatsPage() {
           ) : (
             <div className="flex items-end gap-2 overflow-x-auto pb-2">
               {monthly.map((m) => {
-                const ratio = m.total > 0 ? m.attended / m.total : 0;
+                const ratio = m.total > 0 ? m.participated / m.total : 0;
                 return (
                   <div key={m.month} className="flex flex-col items-center gap-1 min-w-[44px]">
                     <span className="text-[11px] text-gray-500">
-                      {m.attended}/{m.total}
+                      {m.participated}/{m.total}
                     </span>
                     <div className="w-8 h-24 bg-gray-100 rounded-md flex items-end overflow-hidden">
                       <div
@@ -380,7 +380,7 @@ export default function MemberStatsPage() {
                   <div
                     className={cn(
                       'aspect-[2/3] rounded-md overflow-hidden bg-gray-100 border transition-all',
-                      b.attended
+                      b.participated
                         ? 'border-amber-300'
                         : 'border-gray-200 opacity-50 grayscale group-hover:opacity-80'
                     )}
@@ -402,7 +402,7 @@ export default function MemberStatsPage() {
                   </div>
                   <p className="text-[11px] text-gray-600 mt-1 truncate">{b.title}</p>
                   <p className="text-[10px] text-gray-400">
-                    {b.attended ? '참석' : '불참'}
+                    {b.participated ? '참여' : '미참여'}
                     {b.rating ? ` · ${b.rating}점` : ''}
                   </p>
                 </Link>
@@ -411,7 +411,7 @@ export default function MemberStatsPage() {
           )}
           {books.length > 0 && (
             <p className="text-[11px] text-gray-400 mt-4">
-              흐리게 표시된 책은 참석하지 않은 모임입니다.
+              흐리게 표시된 책은 제출물을 남기지 않은 모임입니다.
             </p>
           )}
         </CardContent>
