@@ -13,5 +13,10 @@ CREATE TABLE IF NOT EXISTS year_reviews (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 해마다 다른 느낌을 주기 위한 테마 키 (src/lib/yearbook-themes.ts 의 key).
+-- 값 검증은 애플리케이션에서 한다. 테마 목록은 늘어날 수 있어 CHECK 는 두지 않는다.
+-- 이미 위 CREATE TABLE 을 실행한 뒤라도 이 줄만 다시 돌리면 된다.
+ALTER TABLE year_reviews ADD COLUMN IF NOT EXISTS theme TEXT;
+
 -- 읽기/쓰기는 서버(service role) API 를 경유한다.
 ALTER TABLE year_reviews ENABLE ROW LEVEL SECURITY;

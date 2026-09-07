@@ -5,11 +5,22 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shield, Sparkles, ChevronRight } from 'lucide-react';
+import { getTheme } from '@/lib/yearbook-themes';
+import { cn } from '@/lib/utils';
+
+// 테마 강조색의 실제 hex (배경 연출용)
+const ACCENT_HEX: Record<string, string> = {
+  midnight: '#fbbf24',
+  paper: '#f59e0b',
+  neon: '#e879f9',
+  forest: '#34d399',
+};
 
 interface YearItem {
   year: number;
   meeting_count: number;
   title: string | null;
+  theme: string | null;
   has_review: boolean;
 }
 
@@ -87,25 +98,57 @@ export default function YearbookListPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {years.map((y) => (
-            <Link key={y.year} href={`/yearbook/${y.year}`}>
-              <Card className="h-full hover:border-amber-300 hover:shadow-md transition-all">
-                <CardContent className="flex items-center gap-4">
-                  <div className="p-3 rounded-lg bg-amber-50">
-                    <Sparkles className="w-6 h-6 text-amber-700" />
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {years.map((y, i) => {
+            const theme = getTheme(y.theme);
+            return (
+              <Link
+                key={y.year}
+                href={`/yearbook/${y.year}`}
+                className="group animate-fade-up"
+                style={{ animationDelay: `${i * 70}ms` }}
+              >
+                {/* 그 해 테마를 그대로 미리 보여준다 */}
+                <div
+                  className={cn(
+                    'relative h-44 rounded-2xl overflow-hidden border border-black/5 shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl',
+                    theme.heroBg
+                  )}
+                >
+                  <div
+                    className="animate-blob absolute -top-10 -right-8 w-56 h-56 rounded-full blur-3xl opacity-40"
+                    style={{
+                      background: `radial-gradient(circle, ${ACCENT_HEX[theme.key] ?? '#fbbf24'} 0%, transparent 65%)`,
+                    }}
+                  />
+                  <div className="relative h-full p-5 flex flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                      <Sparkles className={cn('w-5 h-5', theme.accent)} />
+                      <ChevronRight
+                        className={cn(
+                          'w-5 h-5 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all',
+                          theme.textMuted
+                        )}
+                      />
+                    </div>
+                    <div>
+                      <p
+                        className={cn(
+                          'text-4xl font-black bg-clip-text text-transparent',
+                          theme.heroNumber
+                        )}
+                      >
+                        {y.year}
+                      </p>
+                      <p className={cn('text-sm mt-1 truncate', theme.textMuted)}>
+                        {y.title ?? `모임 ${y.meeting_count}회`}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xl font-bold text-gray-900">{y.year}년</p>
-                    <p className="text-sm text-gray-500 truncate">
-                      {y.title ?? `모임 ${y.meeting_count}회`}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

@@ -32,15 +32,21 @@ export async function GET() {
     const years = listYears(data);
 
     // 연도별 요약(모임 수)과, 사람이 쓴 결산이 있는지 여부
-    const { data: saved } = await adminClient.from('year_reviews').select('year, title');
-    const savedMap = new Map((saved ?? []).map((r) => [r.year as number, r.title as string | null]));
+    const { data: saved } = await adminClient.from('year_reviews').select('year, title, theme');
+    const savedMap = new Map(
+      (saved ?? []).map((r) => [
+        r.year as number,
+        { title: (r.title as string | null) ?? null, theme: (r.theme as string | null) ?? null },
+      ])
+    );
 
     const items = years.map((year) => ({
       year,
       meeting_count: data.pastSchedules.filter(
         (s) => new Date(s.meeting_date as string).getFullYear() === year
       ).length,
-      title: savedMap.get(year) ?? null,
+      title: savedMap.get(year)?.title ?? null,
+      theme: savedMap.get(year)?.theme ?? null,
       has_review: savedMap.has(year),
     }));
 

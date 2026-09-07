@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadStatsData } from '@/lib/stats';
 import { buildYearBook } from '@/lib/yearbook';
+import { YEAR_THEMES, DEFAULT_THEME_KEY } from '@/lib/yearbook-themes';
 
 const VIEWABLE_ROLES = ['member', 'admin'];
 
@@ -42,7 +43,7 @@ export async function GET(
     const adminClient = createAdminClient();
     const { data: saved } = await adminClient
       .from('year_reviews')
-      .select('title, intro, highlights')
+      .select('title, intro, highlights, theme')
       .eq('year', year)
       .maybeSingle();
 
@@ -50,6 +51,7 @@ export async function GET(
       yearbook.title = (saved.title as string | null) ?? null;
       yearbook.intro = (saved.intro as string | null) ?? null;
       yearbook.highlights = (saved.highlights as string | null) ?? null;
+      yearbook.theme = (saved.theme as string | null) ?? null;
     }
 
     return NextResponse.json({ yearbook, canEdit: role === 'admin' });
@@ -82,8 +84,11 @@ export async function PUT(
       return NextResponse.json({ error: '관리자만 수정할 수 있습니다.' }, { status: 403 });
     }
 
-    const { title, intro, highlights } = await request.json();
+    const { title, intro, highlights, theme } = await request.json();
     const adminClient = createAdminClient();
+
+    // 알 수 없는 테마 키가 들어와도 화면이 깨지지 않도록 목록에 있는 값만 저장한다
+    const themeKey = YEAR_THEMES.some((t) => t.key === theme) ? theme : DEFAULT_THEME_KEY;
 
     const { error } = await adminClient.from('year_reviews').upsert(
       {
@@ -91,6 +96,7 @@ export async function PUT(
         title: (title ?? '').trim() || null,
         intro: (intro ?? '').trim() || null,
         highlights: (highlights ?? '').trim() || null,
+        theme: themeKey,
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       },

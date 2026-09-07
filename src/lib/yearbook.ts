@@ -53,6 +53,7 @@ export interface YearBook {
   title: string | null;
   intro: string | null;
   highlights: string | null;
+  theme: string | null; // 해마다 다른 느낌을 주는 테마 키 (src/lib/yearbook-themes.ts)
 }
 
 function round1(n: number): number {
@@ -270,5 +271,6 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
     title: null,
     intro: null,
     highlights: null,
+    theme: null,
   };
 }
