@@ -38,6 +38,7 @@ export default function BooksPage() {
   const [filter, setFilter] = useState<BookStatus | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isClassifying, setIsClassifying] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
 
@@ -141,6 +142,59 @@ export default function BooksPage() {
     }
   };
 
+  // 제목만 있는 책(노션에서 옮겨온 과거 기록 등)의 표지·저자를 네이버에서 채운다.
+  const handleBackfill = async () => {
+    setIsBackfilling(true);
+    try {
+      const previewRes = await fetch('/api/books/backfill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: true }),
+      });
+      const preview = await previewRes.json();
+      if (!previewRes.ok) {
+        alert(preview.error || '책 정보를 불러오지 못했습니다.');
+        return;
+      }
+      if (preview.updated === 0) {
+        alert(
+          preview.total === 0
+            ? '표지·저자가 비어 있는 책이 없습니다.'
+            : `대상 ${preview.total}권을 찾았지만 네이버에서 정보를 찾지 못했습니다.`
+        );
+        return;
+      }
+
+      const sample = preview.planned
+        .slice(0, 15)
+        .map((p: { title: string; author: string }) => `· ${p.title} — ${p.author || '저자 미상'}`)
+        .join('\n');
+      const ok = confirm(
+        `${preview.updated}권의 표지·저자·설명을 채웁니다.\n` +
+          (preview.notFound.length > 0
+            ? `(${preview.notFound.length}권은 검색 결과가 없어 건너뜁니다)\n`
+            : '') +
+          `\n${sample}\n\n적용할까요? 이미 값이 있는 항목은 덮어쓰지 않습니다.`
+      );
+      if (!ok) return;
+
+      const res = await fetch('/api/books/backfill', { method: 'POST' });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(result.error || '책 정보를 채우지 못했습니다.');
+        return;
+      }
+      alert(`${result.updated}권을 채웠습니다.`);
+      await fetchBooks();
+    } catch {
+      alert('책 정보를 채우지 못했습니다.');
+    } finally {
+      setIsBackfilling(false);
+    }
+  };
+
+  const needsBackfillCount = books.filter((b) => !b.cover_url || !b.author?.trim()).length;
+
   const filteredBooks = books.filter((book) => {
     if (filter !== 'all' && book.status !== filter) return false;
     if (categoryFilter === 'all') return true;
@@ -194,14 +248,28 @@ export default function BooksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-900">책 목록</h1>
-        <Link href="/books/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            책 추가
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* 제목만 있는 책이 남아 있을 때만 노출 */}
+          {isAdmin && needsBackfillCount > 0 && (
+            <Button
+              variant="outline"
+              onClick={handleBackfill}
+              isLoading={isBackfilling}
+              disabled={isBackfilling}
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              표지·저자 채우기 ({needsBackfillCount})
+            </Button>
+          )}
+          <Link href="/books/new">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              책 추가
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* 상태 필터 탭 */}
