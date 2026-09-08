@@ -1,5 +1,11 @@
 # 팀 페루 독서토론 웹사이트
 
+## 세션 시작 시
+
+**`docs/WORKLOG.md` 를 먼저 읽는다.** 진행 중인 작업, 아직 실행하지 않은 SQL,
+지금까지 정한 결정, 겪은 문제가 정리되어 있다. 대화 내용은 PC 간에 넘어가지 않으므로
+새로운 결정이나 막힌 지점이 생기면 이 문서를 갱신한다.
+
 ## 프로젝트 개요
 - Next.js 14 + Supabase + Tailwind CSS
 - URL: https://teamperu-book.vercel.app
