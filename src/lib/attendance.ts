@@ -46,18 +46,20 @@ export function getLateMinutes(
   return diff > 0 ? diff : null;
 }
 
-/** 한 사람의 출결 판정. */
+/**
+ * 한 사람의 출결 판정.
+ * 명시적으로 '불참'이거나 도착 시각이 시작 시각보다 늦을 때만 각각 불참/지각으로 본다.
+ * 그 밖(기록 없음·도착 시각 미입력·모임 시작 시각 미입력)은 모두 '정시'로 간주한다.
+ */
 export function getVerdict(
   meetingTime: string | null | undefined,
   record: Pick<ArrivalRecord, 'status' | 'arrived_at'> | null | undefined
 ): ArrivalVerdict {
-  if (!record) return 'unknown';
-  if (record.status === 'absent') return 'absent';
-  // 참석은 확인됐지만 도착 시각이나 모임 시작 시각을 모르면 정시/지각을 가를 수 없다.
+  if (record && record.status === 'absent') return 'absent';
   const start = parseTimeToMinutes(meetingTime);
-  const arrived = parseTimeToMinutes(record.arrived_at);
-  if (start === null || arrived === null) return 'unknown';
-  return arrived > start ? 'late' : 'on_time';
+  const arrived = parseTimeToMinutes(record?.arrived_at);
+  if (start !== null && arrived !== null && arrived > start) return 'late';
+  return 'on_time';
 }
 
 /** 지각 시간을 사람이 읽는 문구로. (예: 75 → '1시간 15분') */
