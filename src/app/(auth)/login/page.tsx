@@ -62,15 +62,18 @@ export default function LoginPage() {
       }
 
       if (authData?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', authData.user.id)
-          .single();
-
-        if (profile?.role === 'pending') {
-          window.location.href = '/pending';
-          return;
+        // role 조회는 supabase.from() 대신 서버 API(일반 fetch)로.
+        // signInWithPassword 직후 SIGNED_IN 이벤트로 인증 잠금이 잡혀 있을 수 있어,
+        // 여기서 supabase 쿼리를 하면 잠금 경합/데드락으로 무한 로딩이 날 수 있다.
+        try {
+          const res = await fetch('/api/profile');
+          const { profile } = await res.json();
+          if (profile?.role === 'pending') {
+            window.location.href = '/pending';
+            return;
+          }
+        } catch {
+          // 조회 실패해도 로그인 자체는 성공했으므로 대시보드로 진행
         }
       }
 

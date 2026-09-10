@@ -106,20 +106,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
+      (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return;
 
         const currentUser = session?.user ?? null;
         setUser(currentUser);
 
         if (currentUser) {
-          const p = await fetchProfile(currentUser.id);
-          if (mounted) setProfile(p);
+          // onAuthStateChange 콜백은 GoTrue 인증 잠금(Web Locks)을 쥔 채 호출된다.
+          // 이 안에서 supabase 쿼리를 바로 await 하면, 쿼리가 토큰을 얻으려 내부에서
+          // getSession() 을 부르며 같은(재진입 불가) 잠금을 다시 기다려 데드락이 난다.
+          // 잠금이 풀린 다음 틱에 실행되도록 미룬다. (Supabase 공식 권고)
+          setTimeout(async () => {
+            if (!mounted) return;
+            const p = await fetchProfile(currentUser.id);
+            if (mounted) setProfile(p);
+            if (mounted) finishLoading();
+          }, 0);
         } else {
           setProfile(null);
+          if (mounted) finishLoading();
         }
-
-        if (mounted) finishLoading();
       }
     );
 
