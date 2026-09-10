@@ -896,14 +896,18 @@ export default function SchedulePage() {
                     {editingDetails ? (
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">시간</label>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            시작 시각
+                          </label>
                           <input
-                            type="text"
+                            type="time"
                             value={editMeetingTime}
                             onChange={(e) => setEditMeetingTime(e.target.value)}
-                            placeholder="예: 오후 3시"
                             className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                           />
+                          <p className="mt-1 text-xs text-gray-400">
+                            24시간제(HH:MM). 이 시각 기준으로 지각을 판정합니다.
+                          </p>
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">장소</label>
