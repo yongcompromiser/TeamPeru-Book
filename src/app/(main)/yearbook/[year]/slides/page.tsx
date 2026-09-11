@@ -19,6 +19,7 @@ import {
   Star,
   Maximize2,
   Minimize2,
+  LayoutList,
 } from 'lucide-react';
 import type { YearBook, YearBookEntry, YearMember, YearAward } from '@/lib/yearbook';
 
@@ -214,6 +215,17 @@ export default function YearbookSlidesPage() {
 
       {/* 상단 버튼 */}
       <div className="absolute top-6 right-4 z-20 flex items-center gap-2">
+        {/* 편집은 한눈에 보기 쪽에 있어 바로 갈 수 있게 둔다 */}
+        <Link
+          href={`/yearbook/${year}/overview`}
+          title="한눈에 보기"
+          className={cn(
+            'p-2 rounded-full transition-colors',
+            dark ? 'text-white/60 hover:bg-white/10' : 'text-stone-500 hover:bg-black/5'
+          )}
+        >
+          <LayoutList className="w-5 h-5" />
+        </Link>
         <button
           onClick={toggleFullscreen}
           title={isFullscreen ? '전체화면 끄기' : '전체화면'}
@@ -225,7 +237,7 @@ export default function YearbookSlidesPage() {
           {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
         </button>
         <Link
-          href={`/yearbook/${year}`}
+          href="/yearbook"
           className={cn(
             'p-2 rounded-full transition-colors',
             dark ? 'text-white/60 hover:bg-white/10' : 'text-stone-500 hover:bg-black/5'

@@ -144,8 +144,8 @@ export default function YearbookDetailPage() {
     return (
       <div className="text-center py-12 space-y-4">
         <p className="text-red-600">{error ?? '데이터가 없습니다.'}</p>
-        <Link href={`/yearbook/${year}`} className="text-sm text-amber-700 hover:underline">
-          다시 선택하기
+        <Link href="/yearbook" className="text-sm text-amber-700 hover:underline">
+          연말결산으로 돌아가기
         </Link>
       </div>
     );
@@ -172,7 +172,7 @@ export default function YearbookDetailPage() {
         <div className="relative px-4 sm:px-6 lg:px-8 pt-8 pb-16 sm:pb-24 max-w-5xl mx-auto">
           <div className="flex items-center justify-between gap-3">
             <Link
-              href={`/yearbook/${year}`}
+              href="/yearbook"
               className={cn(
                 'inline-flex items-center gap-1 text-sm hover:opacity-100 transition-opacity opacity-70',
                 theme.textMuted

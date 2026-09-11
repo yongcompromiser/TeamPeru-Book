@@ -108,7 +108,7 @@ export default function YearbookListPage() {
             return (
               <Link
                 key={y.year}
-                href={`/yearbook/${y.year}`}
+                href={`/yearbook/${y.year}/slides`}
                 className="group animate-fade-up"
                 style={{ animationDelay: `${i * 70}ms` }}
               >
