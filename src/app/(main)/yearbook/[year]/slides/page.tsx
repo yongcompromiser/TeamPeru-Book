@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
@@ -746,6 +746,20 @@ function SlideBody({
       .sort((a, b) => b.avg_rating! - a.avg_rating!);
     const top = ranked[0]?.avg_rating ?? 5;
 
+    // 그 해 평균. 이 선을 기준으로 위/아래를 좋았던 책 / 아쉬웠던 책으로 나눈다.
+    const yearAvg =
+      Math.round((ranked.reduce((sum, e) => sum + e.avg_rating!, 0) / ranked.length) * 10) / 10;
+    // 평균 아래로 내려가는 첫 번째 자리. 전부 같은 점수면 -1 이라 선을 긋지 않는다.
+    const firstBelow = ranked.findIndex((e) => e.avg_rating! < yearAvg);
+    const hasSplit = firstBelow > 0;
+
+    const groupLabel = (text: string, tone: string) => (
+      <li className="flex items-center gap-3 pt-1">
+        <span className={cn('text-[11px] font-semibold tracking-wider shrink-0', tone)}>{text}</span>
+        <span className={cn('h-px flex-1', dark ? 'bg-white/10' : 'bg-stone-200')} />
+      </li>
+    );
+
     return (
       <div className="w-full max-w-3xl">
         <p className={cn('text-center text-sm tracking-[0.25em] animate-reveal-up', theme.textMuted)}>
@@ -758,12 +772,42 @@ function SlideBody({
         </p>
 
         <ol className="mt-8 space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+          {hasSplit && groupLabel('좋았던 책', theme.accent)}
+
           {ranked.map((e, i) => (
+            <Fragment key={e.schedule_id}>
+              {/* 평균선 — 여기서부터 평균 아래 */}
+              {hasSplit && i === firstBelow && (
+                <li
+                  className="flex items-center gap-3 py-2 animate-reveal-up"
+                  style={{ animationDelay: `${200 + i * 110}ms` }}
+                >
+                  <span
+                    className={cn('h-px flex-1')}
+                    style={{ background: `${accentHex}55` }}
+                  />
+                  <span
+                    className={cn(
+                      'text-[11px] font-semibold px-2 py-0.5 rounded-full border shrink-0',
+                      theme.accentSoft
+                    )}
+                  >
+                    올해 평균 {yearAvg}점
+                  </span>
+                  <span
+                    className={cn('h-px flex-1')}
+                    style={{ background: `${accentHex}55` }}
+                  />
+                </li>
+              )}
+              {hasSplit && i === firstBelow && groupLabel('아쉬웠던 책', theme.textMuted)}
+
             <li
-              key={e.schedule_id}
               className={cn(
                 'flex items-center gap-3 rounded-xl border px-3 py-2.5 animate-reveal-up',
                 dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-stone-200',
+                // 평균 아래는 한 톤 죽여서 위아래가 눈에 구분되게 한다
+                hasSplit && i >= firstBelow && 'opacity-70',
                 i === 0 && 'ring-1 ring-inset'
               )}
               style={{
@@ -822,6 +866,7 @@ function SlideBody({
                 {e.avg_rating}
               </span>
             </li>
+            </Fragment>
           ))}
         </ol>
       </div>
