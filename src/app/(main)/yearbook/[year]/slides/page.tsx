@@ -333,8 +333,12 @@ function AwardSlide({
 }) {
   // 슬라이드가 바뀌면 상위에서 key 로 재마운트되므로 여기서 따로 초기화할 필요가 없다
   const [settled, setSettled] = useState(false);
-  // 책 상이면 그 책에 남긴 한줄평을 옆에 함께 보여준다
+  // 멈춘 뒤 옆에 한줄평을 함께 보여준다.
+  // 책 상이면 그 책의 평, 멤버 상이면 note 에 적힌 그 책의 평이다.
   const hasQuotes = settled && !!award.one_liners && award.one_liners.length > 0;
+  const isMemberAward = award.key === 'generous' || award.key === 'strict';
+  // note 는 '사피엔스에 5점' 형태 — 앞부분이 책 제목이다
+  const bookTitle = award.note?.replace(/에 \d+(\.\d+)?점$/, '') ?? null;
 
   return (
     <div
@@ -421,7 +425,17 @@ function AwardSlide({
 
         {/* 오른쪽 — 그 책에 남긴 멤버별 한줄평 */}
         {hasQuotes && (
-          <ul className="space-y-3 text-left">
+          <div className="text-left">
+            {/* 멤버 상은 수상자 이름이 크게 떠 있어, 어떤 책에 대한 평인지 밝혀준다 */}
+            {isMemberAward && bookTitle && (
+              <p
+                className={cn('text-xs mb-3 animate-reveal-up', theme.textMuted)}
+                style={{ animationDelay: '200ms' }}
+              >
+                <span className={cn('font-semibold', theme.accent)}>{bookTitle}</span> 에 대한 평
+              </p>
+            )}
+            <ul className="space-y-3">
             {award.one_liners!.map((o, i) => (
               <li
                 key={i}
@@ -458,7 +472,8 @@ function AwardSlide({
                 <p className={cn('mt-2 text-sm leading-relaxed', theme.text)}>“{o.text}”</p>
               </li>
             ))}
-          </ul>
+            </ul>
+          </div>
         )}
       </div>
     </div>

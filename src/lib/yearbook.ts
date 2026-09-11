@@ -40,6 +40,7 @@ export interface YearMember {
 
 // 그 해 그 멤버가 남긴 한 권의 기록 (최고/최저 평가)
 export interface MemberPick {
+  schedule_id: string;
   title: string;
   cover_url: string | null;
   rating: number;
@@ -199,6 +200,7 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
         const entry = entryBySchedule.get(x.schedule_id as string);
         if (!entry) return null;
         return {
+          schedule_id: entry.schedule_id,
           title: entry.title,
           cover_url: entry.cover_url,
           rating,
@@ -285,6 +287,10 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
       cover_url: generous.best?.cover_url ?? null,
       note: generous.best ? `${generous.best.title}에 ${generous.best.rating}점` : null,
       candidates: memberNames,
+      // 그 책에 다른 사람들은 몇 점을 줬는지 나란히 보여줘야 '후하다'가 와닿는다
+      one_liners: generous.best
+        ? entryBySchedule.get(generous.best.schedule_id)?.one_liners
+        : undefined,
     });
 
     if (strict.id !== generous.id) {
@@ -300,6 +306,10 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
             ? `${strict.best.title}에 ${strict.best.rating}점`
             : null,
         candidates: memberNames,
+        one_liners: (() => {
+          const pick = strict.worst ?? strict.best;
+          return pick ? entryBySchedule.get(pick.schedule_id)?.one_liners : undefined;
+        })(),
       });
     }
   }
