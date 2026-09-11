@@ -147,3 +147,49 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   return NextResponse.json({ success: true });
 }
+
+// 참석 신청 삭제 (관리자 전용).
+// 장난 신청이나 테스트로 들어온 것을 지운다.
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const admin = createAdminClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: '관리자만 삭제할 수 있습니다.' }, { status: 403 });
+    }
+
+    const { rsvpId } = await request.json();
+    if (!rsvpId) {
+      return NextResponse.json({ error: 'rsvpId required' }, { status: 400 });
+    }
+
+    // schedule_id 도 함께 걸어 다른 모임의 신청이 지워지지 않게 한다
+    const { error } = await admin
+      .from('meeting_rsvps')
+      .delete()
+      .eq('id', rsvpId)
+      .eq('schedule_id', id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('RSVP delete error:', error);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}

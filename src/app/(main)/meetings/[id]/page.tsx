@@ -123,6 +123,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [meetingComments, setMeetingComments] = useState<MeetingComment[]>([]);
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
+  const [deletingRsvpId, setDeletingRsvpId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
@@ -614,6 +615,31 @@ export default function MeetingDetailPage({ params }: PageProps) {
     setIsSaving(false);
   };
 
+  // 장난 신청이나 테스트로 들어온 참석 신청을 지운다 (관리자 전용).
+  const handleDeleteRsvp = async (rsvp: Rsvp) => {
+    if (!schedule) return;
+    if (!confirm(`'${rsvp.name}' 님의 참석 신청을 삭제할까요?`)) return;
+
+    setDeletingRsvpId(rsvp.id);
+    try {
+      const res = await fetch(`/api/invite/${schedule.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rsvpId: rsvp.id }),
+      });
+      if (res.ok) {
+        setRsvps((prev) => prev.filter((x) => x.id !== rsvp.id));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '삭제에 실패했습니다.');
+      }
+    } catch {
+      alert('삭제에 실패했습니다.');
+    } finally {
+      setDeletingRsvpId(null);
+    }
+  };
+
   const inviteUrl = typeof window !== 'undefined' && schedule
     ? `${window.location.origin}/invite/${schedule.id}`
     : '';
@@ -1007,9 +1033,24 @@ export default function MeetingDetailPage({ params }: PageProps) {
                         </p>
                         {r.message && <p className="text-xs text-gray-600 mt-0.5 break-words">{r.message}</p>}
                       </div>
-                      <span className="text-[11px] text-gray-400 flex-shrink-0">
-                        {format(new Date(r.created_at), 'M/d')}
-                      </span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[11px] text-gray-400">
+                          {format(new Date(r.created_at), 'M/d')}
+                        </span>
+                        <button
+                          type="button"
+                          title="신청 삭제"
+                          disabled={deletingRsvpId === r.id}
+                          onClick={() => handleDeleteRsvp(r)}
+                          className="text-gray-400 hover:text-red-600 disabled:opacity-40"
+                        >
+                          {deletingRsvpId === r.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
