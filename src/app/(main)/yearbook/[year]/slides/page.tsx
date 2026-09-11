@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { Avatar } from '@/components/ui/avatar';
 import { CountUp } from '@/components/features/reveal';
+import { SlotReveal } from '@/components/features/slot-reveal';
 import { YearBackdrop } from '@/components/features/year-backdrop';
 import { getTheme, isDarkTheme } from '@/lib/yearbook-themes';
 import { cn } from '@/lib/utils';
@@ -279,6 +280,96 @@ export default function YearbookSlidesPage() {
   );
 }
 
+// ── 시상 슬라이드 ────────────────────────────────────────────────────────
+// 후보를 슬롯머신으로 돌리다가 수상자에서 멈추고, 그 뒤에 표지·근거를 띄운다.
+function AwardSlide({
+  award,
+  theme,
+  dark,
+  accentHex,
+}: {
+  award: YearAward;
+  theme: ReturnType<typeof getTheme>;
+  dark: boolean;
+  accentHex: string;
+}) {
+  // 슬라이드가 바뀌면 상위에서 key 로 재마운트되므로 여기서 따로 초기화할 필요가 없다
+  const [settled, setSettled] = useState(false);
+
+  return (
+    <div className="text-center w-full max-w-3xl relative">
+      <div
+        className="animate-halo absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[36rem] h-[36rem] rounded-full blur-3xl pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${accentHex}44 0%, transparent 65%)` }}
+      />
+      <div className="relative">
+        <Trophy
+          className="w-12 h-12 mx-auto animate-sparkle"
+          style={{ color: accentHex }}
+        />
+        <p
+          className={cn(
+            'mt-6 text-xl sm:text-3xl tracking-[0.2em] animate-reveal-up',
+            theme.textMuted
+          )}
+        >
+          {award.label}
+        </p>
+
+        {/* 슬롯머신 */}
+        <p className="mt-8 text-4xl sm:text-6xl font-black break-keep leading-tight min-h-[1.2em]">
+          <SlotReveal
+            candidates={award.candidates}
+            winner={award.winner}
+            className={theme.text}
+            spinningClassName={theme.textMuted}
+            onSettled={() => setSettled(true)}
+          />
+        </p>
+
+        {/* 멈춘 뒤에 공개되는 것들 */}
+        {settled && (
+          <>
+            {award.cover_url && (
+              <div className="mt-8 flex justify-center animate-reveal-up">
+                <div
+                  className={cn(
+                    'w-28 sm:w-36 aspect-[2/3] rounded-lg overflow-hidden shadow-2xl border',
+                    dark ? 'border-white/10' : 'border-stone-200'
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={award.cover_url}
+                    alt={award.winner}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+
+            <p
+              className={cn('mt-6 text-lg sm:text-2xl font-bold animate-reveal-up', theme.accent)}
+              style={{ animationDelay: '200ms' }}
+            >
+              {award.detail}
+            </p>
+
+            {award.note && (
+              <p
+                className={cn('mt-2 text-sm sm:text-base animate-reveal-up', theme.textMuted)}
+                style={{ animationDelay: '380ms' }}
+              >
+                {award.note}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── 슬라이드 내용 ────────────────────────────────────────────────────────
 function SlideBody({
   slide,
@@ -350,47 +441,7 @@ function SlideBody({
   }
 
   if (slide.kind === 'award') {
-    const { award } = slide;
-    return (
-      <div className="text-center w-full max-w-3xl relative">
-        {/* 후광 */}
-        <div
-          className="animate-halo absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[36rem] h-[36rem] rounded-full blur-3xl pointer-events-none"
-          style={{ background: `radial-gradient(circle, ${accentHex}44 0%, transparent 65%)` }}
-        />
-        <div className="relative">
-          <Trophy
-            className={cn('w-12 h-12 mx-auto animate-sparkle', theme.accent)}
-            style={{ color: accentHex }}
-          />
-          <p
-            className={cn(
-              'mt-6 text-xl sm:text-3xl tracking-[0.2em] animate-reveal-up',
-              theme.textMuted
-            )}
-          >
-            {award.label}
-          </p>
-
-          {/* 수상 대상은 한 박자 늦게 공개 */}
-          <p
-            className={cn(
-              'mt-8 text-4xl sm:text-6xl font-black break-keep leading-tight animate-focus-in',
-              theme.text
-            )}
-            style={{ animationDelay: '800ms' }}
-          >
-            {award.winner}
-          </p>
-          <p
-            className={cn('mt-5 text-lg sm:text-xl animate-reveal-up', theme.accent)}
-            style={{ animationDelay: '1400ms' }}
-          >
-            {award.detail}
-          </p>
-        </div>
-      </div>
-    );
+    return <AwardSlide award={slide.award} theme={theme} dark={dark} accentHex={accentHex} />;
   }
 
   if (slide.kind === 'member') {
@@ -439,6 +490,59 @@ function SlideBody({
           </div>
           <p className={cn('mt-2 text-sm', theme.textMuted)}>참석률 {rate}%</p>
         </div>
+
+        {/* 그 해 이 사람이 가장 좋게 / 아쉽게 본 책 */}
+        {(m.best || m.worst) && (
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 text-left">
+            {[
+              { label: '가장 좋았던 책', pick: m.best, delay: 1400 },
+              { label: '가장 아쉬웠던 책', pick: m.worst, delay: 1600 },
+            ]
+              .filter((x) => x.pick)
+              .map(({ label, pick, delay }) => (
+                <div
+                  key={label}
+                  className={cn(
+                    'rounded-xl border p-4 flex gap-3 animate-reveal-up',
+                    dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-stone-200'
+                  )}
+                  style={{ animationDelay: `${delay}ms` }}
+                >
+                  <div
+                    className={cn(
+                      'w-12 shrink-0 aspect-[2/3] rounded overflow-hidden border',
+                      dark ? 'border-white/10 bg-white/5' : 'border-stone-200 bg-stone-100'
+                    )}
+                  >
+                    {pick!.cover_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={pick!.cover_url}
+                        alt={pick!.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center p-0.5">
+                        <span className={cn('text-[8px] text-center', theme.textMuted)}>
+                          {pick!.title}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={cn('text-[11px]', theme.accent)}>{label}</p>
+                    <p className={cn('text-sm font-bold truncate', theme.text)}>{pick!.title}</p>
+                    <p className={cn('text-xs mt-0.5', theme.textMuted)}>{pick!.rating}점</p>
+                    {pick!.one_liner && (
+                      <p className={cn('text-xs mt-1.5 line-clamp-3 leading-relaxed', theme.text)}>
+                        “{pick!.one_liner}”
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
     );
   }

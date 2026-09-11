@@ -32,6 +32,18 @@ export interface YearMember {
   discussion_count: number;
   avg_rating: number | null;
   late_count: number;
+  /** 그 해 이 멤버가 가장 높게 평가한 책 */
+  best: MemberPick | null;
+  /** 가장 낮게 평가한 책 (최고와 같은 책이면 null) */
+  worst: MemberPick | null;
+}
+
+// 그 해 그 멤버가 남긴 한 권의 기록 (최고/최저 평가)
+export interface MemberPick {
+  title: string;
+  cover_url: string | null;
+  rating: number;
+  one_liner: string | null;
 }
 
 export interface YearAward {
@@ -39,6 +51,12 @@ export interface YearAward {
   label: string;
   winner: string;
   detail: string;
+  /** 책이 수상 대상이면 표지 */
+  cover_url?: string | null;
+  /** 왜 그런지 한 줄 (예: '찰리 멍거 바이블에 5점') */
+  note?: string | null;
+  /** 발표 전 슬롯머신에 돌릴 후보들. 수상자가 반드시 포함된다. */
+  candidates: string[];
 }
 
 export interface YearBook {
@@ -128,6 +146,7 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
 
   // ── 멤버별 ──
   const targets = data.profiles.filter((p) => COUNTED_ROLES.includes(p.role as string));
+  const entryBySchedule = new Map(entries.map((e) => [e.schedule_id, e]));
 
   const members: YearMember[] = targets.map((p) => {
     const id = p.id as string;
@@ -169,6 +188,34 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
       if (ah * 60 + am > sh * 60 + sm) late_count += 1;
     }
 
+    // 그 해 이 멤버가 가장 높게/낮게 평가한 책.
+    // 같은 점수가 여럿이면 먼저 읽은 책을 고른다(entries 가 날짜순이라 순회 순서가 그대로).
+    const picks = mine
+      .map((x) => {
+        const rating = x.rating as number | null;
+        if (typeof rating !== 'number' || rating <= 0) return null;
+        const entry = entryBySchedule.get(x.schedule_id as string);
+        if (!entry) return null;
+        return {
+          title: entry.title,
+          cover_url: entry.cover_url,
+          rating,
+          one_liner: ((x.one_liner as string | null) ?? '').trim() || null,
+        } satisfies MemberPick;
+      })
+      .filter((x): x is MemberPick => x !== null);
+
+    let best: MemberPick | null = null;
+    let worst: MemberPick | null = null;
+    if (picks.length > 0) {
+      best = picks.reduce((a, b) => (b.rating > a.rating ? b : a));
+      if (picks.length > 1) {
+        const low = picks.reduce((a, b) => (b.rating < a.rating ? b : a));
+        // 최고와 같은 책이면 보여줄 의미가 없다
+        if (low.title !== best.title) worst = low;
+      }
+    }
+
     return {
       id,
       name: (p.name as string) ?? '이름 없음',
@@ -180,30 +227,41 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
       avg_rating:
         ratings.length > 0 ? round1(ratings.reduce((a, c) => a + c, 0) / ratings.length) : null,
       late_count,
+      best,
+      worst,
     };
   });
 
   // ── 시상 ──
+  // 발표 전 슬롯머신을 돌리므로 상마다 후보 목록(candidates)을 함께 넘긴다.
   const awards: YearAward[] = [];
+  const bookTitles = entries.map((e) => e.title);
+  const memberNames = members.map((m) => m.name);
   const rated = entries.filter((e) => e.avg_rating !== null);
 
   if (rated.length > 0) {
-    const best = rated.reduce((a, b2) => (b2.avg_rating! > a.avg_rating! ? b2 : a));
+    const bestBook = rated.reduce((a, b) => (b.avg_rating! > a.avg_rating! ? b : a));
     awards.push({
       key: 'best_book',
       label: '올해의 책',
-      winner: best.title,
-      detail: `평균 ${best.avg_rating}점`,
+      winner: bestBook.title,
+      detail: `평균 ${bestBook.avg_rating}점`,
+      cover_url: bestBook.cover_url,
+      note: bestBook.presenter_name ? `발제 ${bestBook.presenter_name}` : null,
+      candidates: bookTitles,
     });
 
     if (rated.length > 1) {
-      const worst = rated.reduce((a, b2) => (b2.avg_rating! < a.avg_rating! ? b2 : a));
-      if (worst.schedule_id !== best.schedule_id) {
+      const worstBook = rated.reduce((a, b) => (b.avg_rating! < a.avg_rating! ? b : a));
+      if (worstBook.schedule_id !== bestBook.schedule_id) {
         awards.push({
           key: 'worst_book',
           label: '아쉬웠던 책',
-          winner: worst.title,
-          detail: `평균 ${worst.avg_rating}점`,
+          winner: worstBook.title,
+          detail: `평균 ${worstBook.avg_rating}점`,
+          cover_url: worstBook.cover_url,
+          note: worstBook.presenter_name ? `발제 ${worstBook.presenter_name}` : null,
+          candidates: bookTitles,
         });
       }
     }
@@ -211,53 +269,58 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
 
   const withRating = members.filter((m) => m.avg_rating !== null);
   if (withRating.length > 1) {
-    const generous = withRating.reduce((a, b2) => (b2.avg_rating! > a.avg_rating! ? b2 : a));
-    const strict = withRating.reduce((a, b2) => (b2.avg_rating! < a.avg_rating! ? b2 : a));
+    const generous = withRating.reduce((a, b) => (b.avg_rating! > a.avg_rating! ? b : a));
+    const strict = withRating.reduce((a, b) => (b.avg_rating! < a.avg_rating! ? b : a));
+
     awards.push({
       key: 'generous',
       label: '가장 후한 평점',
       winner: generous.name,
       detail: `평균 ${generous.avg_rating}점`,
+      // 숫자만 보여주면 와닿지 않아, 어떤 책에 그렇게 줬는지 함께 보여준다
+      cover_url: generous.best?.cover_url ?? null,
+      note: generous.best ? `${generous.best.title}에 ${generous.best.rating}점` : null,
+      candidates: memberNames,
     });
+
     if (strict.id !== generous.id) {
       awards.push({
         key: 'strict',
         label: '가장 짠 평점',
         winner: strict.name,
         detail: `평균 ${strict.avg_rating}점`,
+        cover_url: strict.worst?.cover_url ?? strict.best?.cover_url ?? null,
+        note: strict.worst
+          ? `${strict.worst.title}에 ${strict.worst.rating}점`
+          : strict.best
+            ? `${strict.best.title}에 ${strict.best.rating}점`
+            : null,
+        candidates: memberNames,
       });
     }
   }
 
   const topDiscussion = members.filter((m) => m.discussion_count > 0);
   if (topDiscussion.length > 0) {
-    const top = topDiscussion.reduce((a, b2) => (b2.discussion_count > a.discussion_count ? b2 : a));
+    const top = topDiscussion.reduce((a, b) => (b.discussion_count > a.discussion_count ? b : a));
     awards.push({
       key: 'discussion',
       label: '발제왕',
       winner: top.name,
       detail: `문항 ${top.discussion_count}개`,
-    });
-  }
-
-  const perfect = members.filter((m) => m.attendable > 0 && m.participated === m.attendable);
-  if (perfect.length > 0) {
-    awards.push({
-      key: 'perfect',
-      label: '개근상',
-      winner: perfect.map((m) => m.name).join(', '),
-      detail: `${schedules.length}회 전부 참석`,
+      candidates: memberNames,
     });
   }
 
   const lateMembers = members.filter((m) => m.late_count > 0);
   if (lateMembers.length > 0) {
-    const worst = lateMembers.reduce((a, b2) => (b2.late_count > a.late_count ? b2 : a));
+    const worstLate = lateMembers.reduce((a, b) => (b.late_count > a.late_count ? b : a));
     awards.push({
       key: 'late',
       label: '지각왕',
-      winner: worst.name,
-      detail: `${worst.late_count}회 지각`,
+      winner: worstLate.name,
+      detail: `${worstLate.late_count}회 지각`,
+      candidates: memberNames,
     });
   }
 
