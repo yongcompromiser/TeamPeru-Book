@@ -77,7 +77,7 @@ export default function YearbookSlidesPage() {
   const [index, setIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const touchStartX = useRef<number | null>(null);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!canView) {
@@ -190,13 +190,6 @@ export default function YearbookSlidesPage() {
       ref={rootRef}
       // 사이드바·헤더까지 덮는다. 전체화면 API 가 안 되는 기기에서도 몰입되도록.
       className={cn('fixed inset-0 z-50 overflow-hidden select-none', theme.pageBg)}
-      onTouchStart={(e) => (touchStartX.current = e.touches[0].clientX)}
-      onTouchEnd={(e) => {
-        if (touchStartX.current === null) return;
-        const dx = e.changedTouches[0].clientX - touchStartX.current;
-        if (Math.abs(dx) > 50) (dx < 0 ? goNext : goPrev)();
-        touchStartX.current = null;
-      }}
     >
       {/* 배경 */}
       <div className={cn('absolute inset-0', theme.heroBg)}>
@@ -252,21 +245,43 @@ export default function YearbookSlidesPage() {
         </Link>
       </div>
 
-      {/* 슬라이드 — key 를 바꿔 매번 등장 애니메이션이 다시 돈다 */}
+      {/* 슬라이드 — key 를 바꿔 매번 등장 애니메이션이 다시 돈다.
+          내용이 화면보다 길면 세로로 스크롤된다(모바일에서 잘리지 않게).
+          포인터 이벤트로 탭/스와이프를 함께 처리한다 — 마우스와 터치를 한 번에 다룬다. */}
       <div
         key={index}
-        className="relative z-10 h-full flex items-center justify-center px-6 sm:px-12 animate-slide-in"
-        onClick={goNext}
+        className="absolute inset-0 z-10 overflow-y-auto overscroll-contain animate-slide-in"
+        style={{ touchAction: 'pan-y' }}
+        onPointerDown={(e) => {
+          pointerStart.current = { x: e.clientX, y: e.clientY };
+        }}
+        onPointerUp={(e) => {
+          const start = pointerStart.current;
+          pointerStart.current = null;
+          if (!start) return;
+          const dx = e.clientX - start.x;
+          const dy = e.clientY - start.y;
+
+          // 가로로 크게 움직였으면 스와이프
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            (dx < 0 ? goNext : goPrev)();
+            return;
+          }
+          // 거의 안 움직였으면 탭 → 다음 장. 스크롤 제스처는 여기서 걸러진다.
+          if (Math.abs(dx) < 10 && Math.abs(dy) < 10) goNext();
+        }}
       >
-        <SlideBody slide={slide} data={data} theme={theme} dark={dark} accentHex={accentHex} />
+        <div className="min-h-full flex items-center justify-center px-5 sm:px-12 py-16 sm:py-20">
+          <SlideBody slide={slide} data={data} theme={theme} dark={dark} accentHex={accentHex} />
+        </div>
       </div>
 
-      {/* 좌우 이동 */}
+      {/* 좌우 이동 — 모바일에서는 화면 가운데를 가려 숨긴다(스와이프·탭으로 넘긴다) */}
       <button
         onClick={goPrev}
         disabled={index === 0}
         className={cn(
-          'absolute left-2 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full transition-opacity disabled:opacity-0',
+          'hidden sm:block absolute left-2 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full transition-opacity disabled:opacity-0',
           dark ? 'text-white/40 hover:text-white/80' : 'text-stone-400 hover:text-stone-700'
         )}
         aria-label="이전"
@@ -276,7 +291,7 @@ export default function YearbookSlidesPage() {
       <button
         onClick={goNext}
         className={cn(
-          'absolute right-2 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full transition-opacity',
+          'hidden sm:block absolute right-2 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full transition-opacity',
           dark ? 'text-white/40 hover:text-white/80' : 'text-stone-400 hover:text-stone-700'
         )}
         aria-label="다음"
@@ -284,14 +299,21 @@ export default function YearbookSlidesPage() {
         <ChevronRight className="w-7 h-7" />
       </button>
 
-      <p
+      {/* 하단 안내 — 내용이 뒤로 지나가도 읽히도록 옅은 그라데이션을 깐다 */}
+      <div
         className={cn(
-          'absolute bottom-4 left-0 right-0 text-center text-[11px] z-20',
-          theme.textMuted
+          'absolute bottom-0 left-0 right-0 z-20 pt-8 pb-3 text-center pointer-events-none',
+          dark
+            ? 'bg-gradient-to-t from-black/50 to-transparent'
+            : 'bg-gradient-to-t from-white/70 to-transparent'
         )}
       >
-        {index + 1} / {slides.length} · 화면을 누르거나 →
-      </p>
+        <p className={cn('text-[11px]', theme.textMuted)}>
+          {index + 1} / {slides.length}
+          <span className="hidden sm:inline"> · 화면을 누르거나 →</span>
+          <span className="sm:hidden"> · 탭 또는 좌우로 밀기</span>
+        </p>
+      </div>
     </div>
   );
 }
@@ -399,7 +421,7 @@ function AwardSlide({
 
         {/* 오른쪽 — 그 책에 남긴 멤버별 한줄평 */}
         {hasQuotes && (
-          <ul className="space-y-3 text-left max-h-[60vh] overflow-y-auto">
+          <ul className="space-y-3 text-left">
             {award.one_liners!.map((o, i) => (
               <li
                 key={i}
@@ -501,7 +523,7 @@ function SlideBody({
               className="animate-reveal-up"
               style={{ animationDelay: `${300 + i * 220}ms` }}
             >
-              <p className={cn('text-7xl sm:text-8xl font-black', theme.accent)}>
+              <p className={cn("text-6xl sm:text-8xl font-black", theme.accent)}>
                 <CountUp value={s.value} duration={1400} />
                 <span className="text-3xl sm:text-4xl font-medium opacity-60">{s.unit}</span>
               </p>
@@ -529,7 +551,7 @@ function SlideBody({
     return (
       <div className="w-full max-w-2xl text-center">
         <div className="animate-reveal-up flex justify-center">
-          <Avatar src={m.avatar_url} name={m.name} size="lg" className="w-24 h-24 text-3xl" />
+          <Avatar src={m.avatar_url} name={m.name} size="lg" className="w-20 h-20 sm:w-24 sm:h-24 text-2xl sm:text-3xl" />
         </div>
         <p
           className={cn('mt-6 text-5xl sm:text-6xl font-black animate-focus-in', theme.text)}
@@ -628,7 +650,7 @@ function SlideBody({
           <div className="shrink-0 animate-reveal-up">
             <div
               className={cn(
-                'w-40 sm:w-56 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border',
+                'w-32 sm:w-56 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border',
                 dark ? 'border-white/10' : 'border-stone-200'
               )}
             >
@@ -699,7 +721,7 @@ function SlideBody({
             )}
 
             {e.one_liners.length > 0 && (
-              <ul className="mt-7 space-y-2.5 max-h-56 overflow-y-auto">
+              <ul className="mt-7 space-y-2.5">
                 {e.one_liners.map((o, k) => (
                   <li
                     key={k}
@@ -728,7 +750,7 @@ function SlideBody({
         </p>
         <p
           className={cn(
-            'mt-8 text-xl sm:text-3xl leading-relaxed whitespace-pre-wrap break-keep animate-reveal-up max-h-[65vh] overflow-y-auto',
+            'mt-8 text-lg sm:text-3xl leading-relaxed whitespace-pre-wrap break-keep animate-reveal-up',
             theme.text
           )}
           style={{ animationDelay: '300ms' }}
@@ -782,14 +804,9 @@ function SlideBody({
           <span className={cn('font-bold', theme.accent)}>{yearAvg}점</span>
         </p>
 
-        {/* 책이 많으면 한 줄 높이를 줄여 경계선까지 한 화면에 들어오게 한다.
-            그래도 넘치면 스크롤되지만, 8권 안팎이면 대부분 다 보인다. */}
-        <ol
-          className={cn(
-            'mt-6 max-h-[58vh] overflow-y-auto pr-1',
-            ranked.length > 6 ? 'space-y-1.5' : 'space-y-2'
-          )}
-        >
+        {/* 내부 스크롤을 두지 않는다. 중첩 스크롤은 모바일에서 다루기 어려워
+            바깥 슬라이드 영역 하나로만 스크롤되게 했다. */}
+        <ol className={cn('mt-6', ranked.length > 6 ? 'space-y-1.5' : 'space-y-2')}>
           {hasSplit && groupLabel('좋았던 책', theme.accent)}
 
           {ranked.map((e, i) => (
