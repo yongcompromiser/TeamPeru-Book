@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { fetchWithTimeout } from '@/lib/fetch-timeout';
 import { Profile } from '@/types';
 
 interface AuthContextType {
@@ -32,14 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const initialized = useRef(false);
   const loadingRef = useRef(true);
 
   const supabase = createClient();
 
   const fetchViaAPI = async (): Promise<{ user: User | null; profile: Profile | null }> => {
     try {
-      const res = await fetch('/api/profile');
+      // 이 호출은 '2초 뒤 무조건 로딩 종료' 안전장치 안에서도 쓰인다.
+      // 타임아웃이 없으면 그 안전장치 자체가 멈춰 무한 로딩이 된다.
+      const res = await fetchWithTimeout('/api/profile', 5000);
       const data = await res.json();
       if (data.profile) {
         return {
@@ -100,9 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
+    // 중복 실행 방지를 ref 로 막지 않는다.
+    // React StrictMode(개발)는 effect 를 실행 → 정리 → 재실행 하는데, ref 로 막으면
+    // 첫 실행분은 정리로 사라지고 두 번째는 아무것도 만들지 않아 구독도 타이머도
+    // 없는 상태가 된다. 그러면 isLoading 을 끝낼 주체가 없어 영원히 로딩이다.
+    // 아래 cleanup 이 이미 구독과 타이머를 정리하므로 중복은 생기지 않는다.
     let mounted = true;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
