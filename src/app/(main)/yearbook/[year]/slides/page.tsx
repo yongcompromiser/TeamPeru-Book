@@ -38,6 +38,7 @@ type Slide =
   | { kind: 'member'; member: YearMember; index: number; total: number }
   | { kind: 'book'; entry: YearBookEntry; index: number; total: number }
   | { kind: 'text'; title: string; body: string }
+  | { kind: 'ranking' }
   | { kind: 'outro' };
 
 function buildSlides(data: YearBook): Slide[] {
@@ -55,6 +56,9 @@ function buildSlides(data: YearBook): Slide[] {
 
   if (data.intro) slides.push({ kind: 'text', title: '올해를 돌아보며', body: data.intro });
   if (data.highlights) slides.push({ kind: 'text', title: '그리고 이런 일들이', body: data.highlights });
+
+  // 마지막에 그 해 책들을 평균 평점 순으로 한 번에 훑는다
+  if (data.entries.some((e) => e.avg_rating !== null)) slides.push({ kind: 'ranking' });
 
   slides.push({ kind: 'outro' });
   return slides;
@@ -307,14 +311,28 @@ function AwardSlide({
 }) {
   // 슬라이드가 바뀌면 상위에서 key 로 재마운트되므로 여기서 따로 초기화할 필요가 없다
   const [settled, setSettled] = useState(false);
+  // 책 상이면 그 책에 남긴 한줄평을 옆에 함께 보여준다
+  const hasQuotes = settled && !!award.one_liners && award.one_liners.length > 0;
 
   return (
-    <div className="text-center w-full max-w-3xl relative">
+    <div
+      className={cn(
+        'relative w-full',
+        hasQuotes ? 'max-w-6xl' : 'max-w-3xl',
+        'text-center'
+      )}
+    >
       <div
         className="animate-halo absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[36rem] h-[36rem] rounded-full blur-3xl pointer-events-none"
         style={{ background: `radial-gradient(circle, ${accentHex}44 0%, transparent 65%)` }}
       />
-      <div className="relative">
+      <div
+        className={cn(
+          'relative',
+          hasQuotes && 'grid gap-8 lg:gap-14 lg:grid-cols-[1fr_1fr] items-center text-left lg:text-center'
+        )}
+      >
+      <div className={cn(hasQuotes && 'lg:text-center')}>
         <Trophy
           className="w-12 h-12 mx-auto animate-sparkle"
           style={{ color: accentHex }}
@@ -376,6 +394,49 @@ function AwardSlide({
               </p>
             )}
           </>
+        )}
+      </div>
+
+        {/* 오른쪽 — 그 책에 남긴 멤버별 한줄평 */}
+        {hasQuotes && (
+          <ul className="space-y-3 text-left max-h-[60vh] overflow-y-auto">
+            {award.one_liners!.map((o, i) => (
+              <li
+                key={i}
+                className={cn(
+                  'rounded-xl border p-4 animate-reveal-up',
+                  dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-stone-200'
+                )}
+                style={{ animationDelay: `${300 + i * 160}ms` }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className={cn('text-sm font-bold', theme.text)}>{o.name}</span>
+                  {o.rating !== null && (
+                    <span className="flex items-center gap-0.5 shrink-0">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          className={cn(
+                            'w-3.5 h-3.5',
+                            n <= Math.round(o.rating!)
+                              ? 'fill-current'
+                              : dark
+                                ? 'text-white/15 fill-white/15'
+                                : 'text-stone-200 fill-stone-200'
+                          )}
+                          style={n <= Math.round(o.rating!) ? { color: accentHex } : undefined}
+                        />
+                      ))}
+                      <span className={cn('ml-1 text-xs font-semibold', theme.accent)}>
+                        {o.rating}
+                      </span>
+                    </span>
+                  )}
+                </div>
+                <p className={cn('mt-2 text-sm leading-relaxed', theme.text)}>“{o.text}”</p>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>
@@ -674,6 +735,95 @@ function SlideBody({
         >
           {slide.body}
         </p>
+      </div>
+    );
+  }
+
+  if (slide.kind === 'ranking') {
+    // 평점이 없는 책은 순위에서 뺀다(순위가 왜곡된다)
+    const ranked = data.entries
+      .filter((e) => e.avg_rating !== null)
+      .sort((a, b) => b.avg_rating! - a.avg_rating!);
+    const top = ranked[0]?.avg_rating ?? 5;
+
+    return (
+      <div className="w-full max-w-3xl">
+        <p className={cn('text-center text-sm tracking-[0.25em] animate-reveal-up', theme.textMuted)}>
+          {data.year}년 책 순위
+        </p>
+        <p
+          className={cn('text-center mt-2 text-2xl sm:text-4xl font-black animate-focus-in', theme.text)}
+        >
+          평균 평점 순
+        </p>
+
+        <ol className="mt-8 space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+          {ranked.map((e, i) => (
+            <li
+              key={e.schedule_id}
+              className={cn(
+                'flex items-center gap-3 rounded-xl border px-3 py-2.5 animate-reveal-up',
+                dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-stone-200',
+                i === 0 && 'ring-1 ring-inset'
+              )}
+              style={{
+                animationDelay: `${200 + i * 110}ms`,
+                ...(i === 0 ? { borderColor: accentHex } : {}),
+              }}
+            >
+              <span
+                className={cn(
+                  'w-7 shrink-0 text-center text-lg font-black tabular-nums',
+                  i === 0 ? '' : theme.textMuted
+                )}
+                style={i === 0 ? { color: accentHex } : undefined}
+              >
+                {i + 1}
+              </span>
+
+              <div
+                className={cn(
+                  'w-8 shrink-0 aspect-[2/3] rounded overflow-hidden border',
+                  dark ? 'border-white/10 bg-white/5' : 'border-stone-200 bg-stone-100'
+                )}
+              >
+                {e.cover_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={e.cover_url} alt={e.title} className="w-full h-full object-cover" />
+                ) : null}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className={cn('text-sm font-bold truncate', theme.text)}>{e.title}</p>
+                {e.presenter_name && (
+                  <p className={cn('text-[11px]', theme.textMuted)}>발제 {e.presenter_name}</p>
+                )}
+              </div>
+
+              {/* 점수 막대 — 1등을 100% 로 둔다 */}
+              <div className="hidden sm:block w-24 shrink-0">
+                <div
+                  className={cn(
+                    'h-1.5 rounded-full overflow-hidden',
+                    dark ? 'bg-white/10' : 'bg-stone-200'
+                  )}
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${(e.avg_rating! / top) * 100}%`, background: accentHex }}
+                  />
+                </div>
+              </div>
+
+              <span
+                className={cn('w-10 shrink-0 text-right text-lg font-bold tabular-nums')}
+                style={{ color: accentHex }}
+              >
+                {e.avg_rating}
+              </span>
+            </li>
+          ))}
+        </ol>
       </div>
     );
   }

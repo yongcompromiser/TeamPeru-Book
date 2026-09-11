@@ -57,6 +57,8 @@ export interface YearAward {
   note?: string | null;
   /** 발표 전 슬롯머신에 돌릴 후보들. 수상자가 반드시 포함된다. */
   candidates: string[];
+  /** 책이 수상 대상이면 그 책에 남긴 멤버별 한줄평·평점 */
+  one_liners?: { name: string; rating: number | null; text: string }[];
 }
 
 export interface YearBook {
@@ -248,6 +250,7 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
       detail: `평균 ${bestBook.avg_rating}점`,
       cover_url: bestBook.cover_url,
       note: bestBook.presenter_name ? `발제 ${bestBook.presenter_name}` : null,
+      one_liners: bestBook.one_liners,
       candidates: bookTitles,
     });
 
@@ -261,6 +264,7 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
           detail: `평균 ${worstBook.avg_rating}점`,
           cover_url: worstBook.cover_url,
           note: worstBook.presenter_name ? `발제 ${worstBook.presenter_name}` : null,
+          one_liners: worstBook.one_liners,
           candidates: bookTitles,
         });
       }
