@@ -770,8 +770,26 @@ function SlideBody({
         >
           평균 평점 순
         </p>
+        {/* 분할선이 스크롤 아래로 밀리거나 아예 안 그어지는 해도 있어, 평균은 여기에 항상 둔다 */}
+        <p
+          className={cn(
+            'text-center mt-3 text-sm animate-reveal-up',
+            theme.textMuted
+          )}
+          style={{ animationDelay: '200ms' }}
+        >
+          {ranked.length}권 · 올해 평균{' '}
+          <span className={cn('font-bold', theme.accent)}>{yearAvg}점</span>
+        </p>
 
-        <ol className="mt-8 space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+        {/* 책이 많으면 한 줄 높이를 줄여 경계선까지 한 화면에 들어오게 한다.
+            그래도 넘치면 스크롤되지만, 8권 안팎이면 대부분 다 보인다. */}
+        <ol
+          className={cn(
+            'mt-6 max-h-[58vh] overflow-y-auto pr-1',
+            ranked.length > 6 ? 'space-y-1.5' : 'space-y-2'
+          )}
+        >
           {hasSplit && groupLabel('좋았던 책', theme.accent)}
 
           {ranked.map((e, i) => (
@@ -779,32 +797,25 @@ function SlideBody({
               {/* 평균선 — 여기서부터 평균 아래 */}
               {hasSplit && i === firstBelow && (
                 <li
-                  className="flex items-center gap-3 py-2 animate-reveal-up"
+                  className="flex items-center gap-3 py-3 animate-reveal-up"
                   style={{ animationDelay: `${200 + i * 110}ms` }}
                 >
+                  <span className="h-0.5 flex-1 rounded-full" style={{ background: accentHex }} />
                   <span
-                    className={cn('h-px flex-1')}
-                    style={{ background: `${accentHex}55` }}
-                  />
-                  <span
-                    className={cn(
-                      'text-[11px] font-semibold px-2 py-0.5 rounded-full border shrink-0',
-                      theme.accentSoft
-                    )}
+                    className="text-xs font-bold px-3 py-1 rounded-full shrink-0 text-black"
+                    style={{ background: accentHex }}
                   >
                     올해 평균 {yearAvg}점
                   </span>
-                  <span
-                    className={cn('h-px flex-1')}
-                    style={{ background: `${accentHex}55` }}
-                  />
+                  <span className="h-0.5 flex-1 rounded-full" style={{ background: accentHex }} />
                 </li>
               )}
               {hasSplit && i === firstBelow && groupLabel('아쉬웠던 책', theme.textMuted)}
 
             <li
               className={cn(
-                'flex items-center gap-3 rounded-xl border px-3 py-2.5 animate-reveal-up',
+                'flex items-center gap-3 rounded-xl border px-3 animate-reveal-up',
+                ranked.length > 6 ? 'py-1.5' : 'py-2.5',
                 dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-stone-200',
                 // 평균 아래는 한 톤 죽여서 위아래가 눈에 구분되게 한다
                 hasSplit && i >= firstBelow && 'opacity-70',
