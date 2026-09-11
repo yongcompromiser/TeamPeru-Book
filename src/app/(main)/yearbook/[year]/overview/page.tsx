@@ -49,7 +49,7 @@ export default function YearbookDetailPage() {
   const year = params.year as string;
   const { profile } = useAuth();
   // 연말결산은 아직 다듬는 중이라 관리자에게만 보인다.
-  const canView = profile?.role === 'admin';
+  const canView = profile?.role === 'member' || profile?.role === 'admin';
 
   const [data, setData] = useState<YearBook | null>(null);
   const [canEdit, setCanEdit] = useState(false);
@@ -62,6 +62,7 @@ export default function YearbookDetailPage() {
   const [introInput, setIntroInput] = useState('');
   const [highlightsInput, setHighlightsInput] = useState('');
   const [themeInput, setThemeInput] = useState('midnight');
+  const [publishedInput, setPublishedInput] = useState(false);
 
   const load = async () => {
     try {
@@ -76,6 +77,7 @@ export default function YearbookDetailPage() {
         setIntroInput(json.yearbook.intro ?? '');
         setHighlightsInput(json.yearbook.highlights ?? '');
         setThemeInput(json.yearbook.theme ?? 'midnight');
+        setPublishedInput(json.yearbook.is_published === true);
       }
     } catch {
       setError('불러오지 못했습니다.');
@@ -104,6 +106,7 @@ export default function YearbookDetailPage() {
           intro: introInput,
           highlights: highlightsInput,
           theme: themeInput,
+          is_published: publishedInput,
         }),
       });
       if (!res.ok) {
@@ -124,7 +127,7 @@ export default function YearbookDetailPage() {
     return (
       <div className="text-center py-12">
         <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">관리자만 접근할 수 있습니다</p>
+        <p className="text-gray-500">정회원만 볼 수 있습니다</p>
       </div>
     );
   }
@@ -240,6 +243,40 @@ export default function YearbookDetailPage() {
           <div className={cn('rounded-2xl border p-5 space-y-4', theme.card)}>
             <p className={cn('font-semibold', theme.text)}>결산 편집</p>
 
+            {/* 공개 여부 — 체크해야 멤버에게 보인다 */}
+            <button
+              type="button"
+              onClick={() => setPublishedInput((v) => !v)}
+              className={cn(
+                'w-full flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors',
+                publishedInput ? theme.accentSoft : cn(theme.card, theme.textMuted)
+              )}
+            >
+              <span>
+                <span className={cn('block text-sm font-medium', publishedInput ? '' : theme.text)}>
+                  {publishedInput ? '멤버에게 공개 중' : '비공개 (관리자만)'}
+                </span>
+                <span className="block text-xs opacity-70 mt-0.5">
+                  {publishedInput
+                    ? '정회원이 목록에서 이 해를 볼 수 있어요.'
+                    : '다 다듬은 뒤 켜면 정회원에게 열립니다.'}
+                </span>
+              </span>
+              <span
+                className={cn(
+                  'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+                  publishedInput ? 'bg-green-500' : dark ? 'bg-white/20' : 'bg-stone-300'
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-5 w-5 transform rounded-full bg-white transition-transform',
+                    publishedInput ? 'translate-x-5' : 'translate-x-0.5'
+                  )}
+                />
+              </span>
+            </button>
+
             <div>
               <label className={cn('block text-sm mb-2', theme.textMuted)}>테마</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -304,6 +341,7 @@ export default function YearbookDetailPage() {
                   setIntroInput(data.intro ?? '');
                   setHighlightsInput(data.highlights ?? '');
                   setThemeInput(data.theme ?? 'midnight');
+                  setPublishedInput(data.is_published === true);
                 }}
               >
                 <X className="w-4 h-4 mr-1" />

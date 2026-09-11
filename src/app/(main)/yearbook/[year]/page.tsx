@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { YearBackdrop } from '@/components/features/year-backdrop';
 import { getTheme } from '@/lib/yearbook-themes';
 import { cn } from '@/lib/utils';
-import { Shield, ArrowLeft, Play, LayoutList, ChevronRight } from 'lucide-react';
+import { Shield, ArrowLeft, Play, LayoutList, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import type { YearBook } from '@/lib/yearbook';
 
 const ACCENT_HEX: Record<string, string> = {
@@ -21,7 +21,7 @@ export default function YearbookChooserPage() {
   const params = useParams();
   const year = params.year as string;
   const { profile } = useAuth();
-  const canView = profile?.role === 'admin';
+  const canView = profile?.role === 'member' || profile?.role === 'admin';
 
   const [data, setData] = useState<YearBook | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,7 +55,7 @@ export default function YearbookChooserPage() {
     return (
       <div className="text-center py-12">
         <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">관리자만 접근할 수 있습니다</p>
+        <p className="text-gray-500">정회원만 볼 수 있습니다</p>
       </div>
     );
   }
@@ -145,6 +145,31 @@ export default function YearbookChooserPage() {
               >
                 모임 {data.meeting_count}회 · 함께 읽은 책 {data.book_count}권
               </p>
+
+              {/* 관리자에게만 공개 상태를 알린다. 공개 전환은 '한눈에 보기'의 편집에서 한다. */}
+              {profile?.role === 'admin' && (
+                <p
+                  className={cn(
+                    'mt-4 inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border animate-fade-up',
+                    data.is_published
+                      ? 'bg-green-500/15 border-green-400/40 text-green-300'
+                      : theme.accentSoft
+                  )}
+                  style={{ animationDelay: '260ms' }}
+                >
+                  {data.is_published ? (
+                    <>
+                      <Eye className="w-3.5 h-3.5" />
+                      멤버에게 공개 중
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5" />
+                      비공개 — 한눈에 보기에서 공개로 바꿀 수 있어요
+                    </>
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="mt-12 grid gap-4 sm:grid-cols-2">

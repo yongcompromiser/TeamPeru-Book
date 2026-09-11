@@ -21,13 +21,15 @@ interface YearItem {
   meeting_count: number;
   title: string | null;
   theme: string | null;
+  is_published: boolean;
   has_review: boolean;
 }
 
 export default function YearbookListPage() {
   const { profile } = useAuth();
-  // 연말결산은 아직 다듬는 중이라 관리자에게만 보인다.
-  const canView = profile?.role === 'admin';
+  // 정회원은 관리자가 공개로 체크한 연도만 본다(서버에서 걸러진다).
+  const canView = profile?.role === 'member' || profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin';
 
   const [years, setYears] = useState<YearItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +64,7 @@ export default function YearbookListPage() {
     return (
       <div className="text-center py-12">
         <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">관리자만 접근할 수 있습니다</p>
+        <p className="text-gray-500">정회원만 볼 수 있습니다</p>
       </div>
     );
   }
@@ -89,13 +91,14 @@ export default function YearbookListPage() {
         <h1 className="text-2xl font-bold text-gray-900">연말결산</h1>
         <p className="text-sm text-gray-500 mt-1">
           그 해에 읽은 책, 평점, 참여, 시상을 모아봅니다. 기록에서 자동으로 만들어집니다.
+          {isAdmin && ' 각 연도에서 공개로 체크해야 멤버에게 보입니다.'}
         </p>
       </div>
 
       {years.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
-            아직 지난 모임이 없습니다.
+            {isAdmin ? '아직 지난 모임이 없습니다.' : '아직 공개된 연말결산이 없어요.'}
           </CardContent>
         </Card>
       ) : (
@@ -124,7 +127,22 @@ export default function YearbookListPage() {
                   />
                   <div className="relative h-full p-5 flex flex-col justify-between">
                     <div className="flex items-start justify-between">
-                      <Sparkles className={cn('w-5 h-5', theme.accent)} />
+                      <span className="flex items-center gap-2">
+                        <Sparkles className={cn('w-5 h-5', theme.accent)} />
+                        {/* 관리자에게만 공개 상태를 표시한다 */}
+                        {isAdmin && (
+                          <span
+                            className={cn(
+                              'text-[10px] font-semibold px-2 py-0.5 rounded-full border',
+                              y.is_published
+                                ? 'bg-green-500/15 border-green-400/40 text-green-300'
+                                : 'bg-white/10 border-white/20 text-white/60'
+                            )}
+                          >
+                            {y.is_published ? '공개' : '비공개'}
+                          </span>
+                        )}
+                      </span>
                       <ChevronRight
                         className={cn(
                           'w-5 h-5 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all',

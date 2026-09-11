@@ -54,6 +54,7 @@ export interface YearBook {
   intro: string | null;
   highlights: string | null;
   theme: string | null; // 해마다 다른 느낌을 주는 테마 키 (src/lib/yearbook-themes.ts)
+  is_published: boolean; // 관리자가 공개로 체크해야 멤버가 볼 수 있다
 }
 
 function round1(n: number): number {
@@ -272,5 +273,6 @@ export function buildYearBook(data: StatsData, year: number): YearBook {
     intro: null,
     highlights: null,
     theme: null,
+    is_published: false,
   };
 }

@@ -18,5 +18,9 @@ CREATE TABLE IF NOT EXISTS year_reviews (
 -- 이미 위 CREATE TABLE 을 실행한 뒤라도 이 줄만 다시 돌리면 된다.
 ALTER TABLE year_reviews ADD COLUMN IF NOT EXISTS theme TEXT;
 
+-- 연도별 공개 여부. 기본은 비공개라 관리자가 다듬는 동안 멤버에게 보이지 않는다.
+-- 관리자가 체크해야 그 해 결산이 멤버에게 열린다.
+ALTER TABLE year_reviews ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT false;
+
 -- 읽기/쓰기는 서버(service role) API 를 경유한다.
 ALTER TABLE year_reviews ENABLE ROW LEVEL SECURITY;

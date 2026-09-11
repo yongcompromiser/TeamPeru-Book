@@ -4,8 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { loadStatsData } from '@/lib/stats';
 import { listYears } from '@/lib/yearbook';
 
-// 결산이 있는 연도 목록. 아직 다듬는 중이라 관리자에게만 보인다.
-const VIEWABLE_ROLES = ['admin'];
+// 결산이 있는 연도 목록.
+// 관리자는 전부, 정회원은 관리자가 공개로 체크한 연도만 본다.
+const VIEWABLE_ROLES = ['member', 'admin'];
 
 export async function GET() {
   try {
@@ -32,25 +33,37 @@ export async function GET() {
     const years = listYears(data);
 
     // 연도별 요약(모임 수)과, 사람이 쓴 결산이 있는지 여부
-    const { data: saved } = await adminClient.from('year_reviews').select('year, title, theme');
+    const { data: saved } = await adminClient
+      .from('year_reviews')
+      .select('year, title, theme, is_published');
     const savedMap = new Map(
       (saved ?? []).map((r) => [
         r.year as number,
-        { title: (r.title as string | null) ?? null, theme: (r.theme as string | null) ?? null },
+        {
+          title: (r.title as string | null) ?? null,
+          theme: (r.theme as string | null) ?? null,
+          is_published: r.is_published === true,
+        },
       ])
     );
 
-    const items = years.map((year) => ({
-      year,
-      meeting_count: data.pastSchedules.filter(
-        (s) => new Date(s.meeting_date as string).getFullYear() === year
-      ).length,
-      title: savedMap.get(year)?.title ?? null,
-      theme: savedMap.get(year)?.theme ?? null,
-      has_review: savedMap.has(year),
-    }));
+    const isAdmin = profile.role === 'admin';
 
-    return NextResponse.json({ years: items });
+    const items = years
+      // 정회원에게는 공개로 체크된 연도만 보여준다
+      .filter((year) => isAdmin || savedMap.get(year)?.is_published === true)
+      .map((year) => ({
+        year,
+        meeting_count: data.pastSchedules.filter(
+          (s) => new Date(s.meeting_date as string).getFullYear() === year
+        ).length,
+        title: savedMap.get(year)?.title ?? null,
+        theme: savedMap.get(year)?.theme ?? null,
+        is_published: savedMap.get(year)?.is_published ?? false,
+        has_review: savedMap.has(year),
+      }));
+
+    return NextResponse.json({ years: items, canEdit: isAdmin });
   } catch (error) {
     console.error('Yearbook GET error:', error);
     return NextResponse.json({ error: '연말결산을 불러오지 못했습니다.' }, { status: 500 });
