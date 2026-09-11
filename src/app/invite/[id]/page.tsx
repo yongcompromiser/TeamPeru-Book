@@ -27,13 +27,6 @@ export default function InvitePage({ params }: PageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  const [name, setName] = useState('');
-  const [contact, setContact] = useState('');
-  const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
-
   useEffect(() => {
     (async () => {
       try {
@@ -50,39 +43,6 @@ export default function InvitePage({ params }: PageProps) {
       setIsLoading(false);
     })();
   }, [id]);
-
-  const handleSubmit = async () => {
-    if (!name.trim()) {
-      setError('이름을 입력해주세요.');
-      return;
-    }
-    setIsSubmitting(true);
-    setError('');
-    try {
-      const res = await fetch(`/api/invite/${id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, contact, message }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setSubmitted(true);
-      } else {
-        // 서버의 코드성 에러(not_found 등)는 그대로 노출하지 않고 친화 문구로 변환.
-        // 한글이 담긴 메시지는 사용자용이므로 그대로 사용.
-        let msg = '신청에 실패했어요. 다시 시도해주세요.';
-        if (res.status === 404 || data.error === 'not_found') {
-          msg = '초대가 마감되었어요. 모임 관리자에게 문의해주세요.';
-        } else if (typeof data.error === 'string' && /[가-힣]/.test(data.error)) {
-          msg = data.error;
-        }
-        setError(msg);
-      }
-    } catch {
-      setError('신청 중 오류가 발생했습니다.');
-    }
-    setIsSubmitting(false);
-  };
 
   if (isLoading) {
     return (
@@ -162,85 +122,41 @@ export default function InvitePage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* RSVP 폼 / 완료 */}
-        {submitted ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-              <Check className="w-6 h-6 text-green-600" />
-            </div>
-            <h3 className="font-bold text-gray-900">참석 신청 완료!</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              신청해주셔서 감사합니다. 모임 전에 안내드릴게요. 편하게 오세요 😊
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="font-bold text-gray-900 mb-3">참석 신청하기</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">이름 *</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="어떻게 불러드리면 될까요?"
-                  maxLength={40}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">연락처 (선택)</label>
-                <input
-                  type="text"
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  placeholder="카톡 ID·전화번호 등 (안내용)"
-                  maxLength={100}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">한마디 (선택)</label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="궁금한 점이나 하고 싶은 말이 있다면?"
-                  maxLength={300}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-20"
-                />
-              </div>
+        {/* 참여는 카카오로만 받는다.
+            익명 신청은 누가 오는지 확인할 길이 없고 장난 신청도 막기 어려워 없앴다. */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
+          <h3 className="font-bold text-gray-900">참석하시겠어요?</h3>
+          <p className="text-sm text-gray-500 mt-1 mb-4">
+            카카오로 참여하면 참석 신청과 입장이 한 번에 끝나요.
+          </p>
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
-
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="w-full h-11 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : '참석 신청하기'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 카카오 게스트 참여 (계정으로 더 깊이 참여) */}
-        <div className="mt-5 text-center">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400">더 깊이 참여하고 싶다면</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
           <a
             href={`/api/auth/kakao/start?mode=guest&next=/meetings/${id}`}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] px-4 text-sm font-medium text-[#191600] transition-opacity hover:opacity-90"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] px-4 text-base font-semibold text-[#191600] transition-opacity hover:opacity-90"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path fill="#191600" d="M12 3C6.477 3 2 6.477 2 10.8c0 2.77 1.86 5.2 4.66 6.58-.2.72-.74 2.66-.85 3.07-.13.51.19.5.4.37.16-.11 2.6-1.77 3.66-2.49.69.1 1.4.16 2.13.16 5.523 0 10-3.477 10-7.69C24 6.477 17.523 3 12 3Z" />
             </svg>
             카카오로 게스트 참여하기
           </a>
-          <p className="text-xs text-gray-400 mt-2">
-            승인 없이 바로 입장 — 책·회의록을 둘러보고 한줄평·평점을 남길 수 있어요.
+
+          <ul className="text-xs text-gray-500 mt-4 space-y-1.5 text-left">
+            <li className="flex items-start gap-2">
+              <Check className="w-3.5 h-3.5 text-green-600 mt-0.5 shrink-0" />
+              승인을 기다릴 필요 없이 바로 입장돼요
+            </li>
+            <li className="flex items-start gap-2">
+              <Check className="w-3.5 h-3.5 text-green-600 mt-0.5 shrink-0" />
+              참석 명단에 자동으로 올라가요
+            </li>
+            <li className="flex items-start gap-2">
+              <Check className="w-3.5 h-3.5 text-green-600 mt-0.5 shrink-0" />
+              책·회의록을 둘러보고 한줄평과 평점을 남길 수 있어요
+            </li>
+          </ul>
+
+          <p className="text-[11px] text-gray-400 mt-4">
+            카카오 닉네임만 받아요. 이메일이나 전화번호는 받지 않습니다.
           </p>
         </div>
 

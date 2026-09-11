@@ -132,6 +132,39 @@ export async function GET(request: NextRequest) {
         if (mode === 'guest' && target.role === 'pending') {
           await admin.from('profiles').update({ role: 'guest' }).eq('id', target.id);
         }
+
+        // 초대장(/invite/[id])을 통해 들어온 경우 그 모임의 참석 명단에 자동 등록.
+        // 초대장에서 익명 신청 폼을 없앴기 때문에, 이게 없으면 관리자가 누가 오는지
+        // 알 수 없게 된다.
+        if (mode === 'guest') {
+          const scheduleId = next.match(/^\/meetings\/([0-9a-f-]{36})$/i)?.[1];
+          if (scheduleId) {
+            try {
+              const { data: existingRsvp } = await admin
+                .from('meeting_rsvps')
+                .select('id')
+                .eq('schedule_id', scheduleId)
+                .eq('user_id', target.id)
+                .maybeSingle();
+
+              if (existingRsvp) {
+                await admin
+                  .from('meeting_rsvps')
+                  .update({ name: kakaoUser.nickname })
+                  .eq('id', existingRsvp.id);
+              } else {
+                await admin.from('meeting_rsvps').insert({
+                  schedule_id: scheduleId,
+                  user_id: target.id,
+                  name: kakaoUser.nickname,
+                });
+              }
+            } catch (e) {
+              // 명단 등록 실패가 입장 자체를 막으면 안 된다
+              console.error('게스트 참석 명단 등록 실패:', e);
+            }
+          }
+        }
       }
     }
 
