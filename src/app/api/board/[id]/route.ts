@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { isValidCategory } from '@/lib/board';
 
 export async function GET(
   request: Request,
@@ -9,6 +10,11 @@ export async function GET(
   try {
     const { id } = await params;
     const admin = createAdminClient();
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     // board_posts 는 profiles 와 FK 가 없어 PostgREST 임베드 조인이 안 된다.
     // 프로필은 따로 조회해 붙인다(목록 API 와 동일한 방식).
@@ -22,14 +28,18 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // 조회수 +1 (컬럼이 아직 없으면 조용히 무시)
+    // 좋아요 수 / 내가 눌렀는지 (테이블 없으면 무시)
+    let likeCount = 0;
+    let liked = false;
     try {
-      await admin
-        .from('board_posts')
-        .update({ view_count: (post.view_count ?? 0) + 1 })
-        .eq('id', id);
+      const { data: likes } = await admin
+        .from('board_post_likes')
+        .select('user_id')
+        .eq('post_id', id);
+      likeCount = (likes || []).length;
+      liked = !!user && (likes || []).some((l) => l.user_id === user.id);
     } catch {
-      /* view_count 컬럼 미존재 시 무시 */
+      /* board_post_likes 미존재 시 무시 */
     }
 
     const { data: comments } = await admin
@@ -49,7 +59,7 @@ export async function GET(
       avatar_url: pmap.get(uid)?.avatar_url || null,
     });
 
-    const postWithProfile = { ...post, profile: attach(post.user_id) };
+    const postWithProfile = { ...post, profile: attach(post.user_id), like_count: likeCount, liked };
     const commentsWithProfile = (comments || []).map((c) => ({ ...c, profile: attach(c.user_id) }));
 
     return NextResponse.json({ post: postWithProfile, comments: commentsWithProfile });
@@ -110,10 +120,25 @@ export async function PATCH(
     if (!title?.trim() || !content?.trim()) {
       return NextResponse.json({ error: '제목과 내용을 입력해주세요' }, { status: 400 });
     }
-    const { error } = await admin
-      .from('board_posts')
-      .update({ title: title.trim(), content: content.trim(), updated_at: new Date().toISOString() })
-      .eq('id', id);
+
+    // 카테고리 — '공지'는 관리자만
+    let category = body.category;
+    if (!category || !isValidCategory(category)) category = undefined;
+    if (category === '공지' && !isAdmin) category = undefined;
+
+    const patch: Record<string, unknown> = {
+      title: title.trim(),
+      content: content.trim(),
+      updated_at: new Date().toISOString(),
+    };
+    if (category) patch.category = category;
+
+    let { error } = await admin.from('board_posts').update(patch).eq('id', id);
+    // category 컬럼이 아직 없으면 category 빼고 재시도
+    if (error && category) {
+      delete patch.category;
+      ({ error } = await admin.from('board_posts').update(patch).eq('id', id));
+    }
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

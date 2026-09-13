@@ -7,12 +7,15 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, Send } from 'lucide-react';
+import { BOARD_CATEGORIES, DEFAULT_CATEGORY } from '@/lib/board';
 
 export default function NewPostPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,7 +33,7 @@ export default function NewPostPage() {
       const res = await fetch('/api/board', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ title, content, category }),
       });
 
       if (res.ok) {
@@ -79,6 +82,28 @@ export default function NewPostPage() {
                 {error}
               </div>
             )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                카테고리
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {BOARD_CATEGORIES.filter((c) => !c.adminOnly || isAdmin).map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => setCategory(c.key)}
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                      category === c.key
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

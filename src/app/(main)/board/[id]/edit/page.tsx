@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
+import { BOARD_CATEGORIES, DEFAULT_CATEGORY } from '@/lib/board';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -16,8 +17,10 @@ export default function EditPostPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
   const { user, profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [authorId, setAuthorId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,6 +35,7 @@ export default function EditPostPage({ params }: PageProps) {
           if (data.post) {
             setTitle(data.post.title || '');
             setContent(data.post.content || '');
+            setCategory(data.post.category || DEFAULT_CATEGORY);
             setAuthorId(data.post.user_id || null);
           }
         }
@@ -42,7 +46,6 @@ export default function EditPostPage({ params }: PageProps) {
     })();
   }, [id]);
 
-  const isAdmin = profile?.role === 'admin';
   const canEdit = !isLoading && user && (user.id === authorId || isAdmin);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,7 +60,7 @@ export default function EditPostPage({ params }: PageProps) {
       const res = await fetch(`/api/board/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ title, content, category }),
       });
       if (res.ok) {
         router.push(`/board/${id}`);
@@ -109,6 +112,26 @@ export default function EditPostPage({ params }: PageProps) {
             {error && (
               <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
             )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">카테고리</label>
+              <div className="flex flex-wrap gap-2">
+                {BOARD_CATEGORIES.filter((c) => !c.adminOnly || isAdmin).map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => setCategory(c.key)}
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                      category === c.key
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>

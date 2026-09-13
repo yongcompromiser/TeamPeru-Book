@@ -9,10 +9,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  ArrowLeft, User, Clock, Send, Loader2, Trash2, MessageSquare, Eye, Pencil, Pin, X, Check,
+  ArrowLeft, User, Clock, Send, Loader2, Trash2, MessageSquare, Heart, Pencil, Pin, X, Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
+import { categoryBadge } from '@/lib/board';
 
 interface Post {
   id: string;
@@ -22,7 +23,9 @@ interface Post {
   created_at: string;
   updated_at?: string | null;
   is_pinned?: boolean;
-  view_count?: number;
+  category?: string;
+  like_count?: number;
+  liked?: boolean;
   profile?: { name: string; avatar_url?: string | null };
 }
 
@@ -51,6 +54,9 @@ export default function PostDetailPage({ params }: PageProps) {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPinning, setIsPinning] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [isLiking, setIsLiking] = useState(false);
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState('');
 
@@ -70,6 +76,8 @@ export default function PostDetailPage({ params }: PageProps) {
         const data = await res.json();
         setPost(data.post);
         setComments(data.comments || []);
+        setLiked(!!data.post?.liked);
+        setLikeCount(data.post?.like_count ?? 0);
       }
     } catch (e) {
       console.log('Failed to fetch post');
@@ -123,6 +131,30 @@ export default function PostDetailPage({ params }: PageProps) {
       console.log('Failed to toggle pin');
     }
     setIsPinning(false);
+  };
+
+  const handleToggleLike = async () => {
+    if (!user || isLiking) return;
+    setIsLiking(true);
+    // 낙관적 업데이트
+    setLiked((v) => !v);
+    setLikeCount((c) => c + (liked ? -1 : 1));
+    try {
+      const res = await fetch(`/api/board/${id}/like`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setLiked(!!data.liked);
+        setLikeCount(data.count ?? 0);
+      } else {
+        // 실패 시 롤백
+        setLiked((v) => !v);
+        setLikeCount((c) => c + (liked ? 1 : -1));
+      }
+    } catch (e) {
+      setLiked((v) => !v);
+      setLikeCount((c) => c + (liked ? 1 : -1));
+    }
+    setIsLiking(false);
   };
 
   const handleEditComment = async (commentId: string) => {
@@ -189,6 +221,11 @@ export default function PostDetailPage({ params }: PageProps) {
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
+              <div className="mb-1.5">
+                <span className={cn('inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold border', categoryBadge(post.category).badge)}>
+                  {categoryBadge(post.category).label}
+                </span>
+              </div>
               <CardTitle className="text-xl flex items-center gap-2">
                 {post.is_pinned && <Pin className="w-4 h-4 text-amber-600 fill-amber-500 flex-shrink-0" />}
                 {post.title}
@@ -205,10 +242,6 @@ export default function PostDetailPage({ params }: PageProps) {
                   <Clock className="w-4 h-4" />
                   {format(new Date(post.created_at), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
                   {post.updated_at && <span className="text-gray-400 ml-1">(수정됨)</span>}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Eye className="w-4 h-4" />
-                  {post.view_count ?? 0}
                 </span>
               </div>
             </div>
@@ -249,6 +282,24 @@ export default function PostDetailPage({ params }: PageProps) {
         </CardHeader>
         <CardContent>
           <p className="text-gray-700 whitespace-pre-wrap">{post.content}</p>
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              onClick={handleToggleLike}
+              disabled={!user || isLiking}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm font-medium transition-colors',
+                liked
+                  ? 'bg-rose-50 border-rose-200 text-rose-600'
+                  : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50',
+                !user && 'opacity-60 cursor-not-allowed'
+              )}
+              title={user ? '좋아요' : '로그인이 필요합니다'}
+            >
+              <Heart className={cn('w-4 h-4', liked && 'fill-rose-500 text-rose-500')} />
+              좋아요 {likeCount > 0 && likeCount}
+            </button>
+          </div>
         </CardContent>
       </Card>
 
