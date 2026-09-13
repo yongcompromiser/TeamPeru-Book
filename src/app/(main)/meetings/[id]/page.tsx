@@ -1684,14 +1684,19 @@ export default function MeetingDetailPage({ params }: PageProps) {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => {
-                      const blob = new Blob(
-                        ['<html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:20px;max-width:800px;margin:0 auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5}h1,h2,h3{color:#1a1a1a}</style></head><body>' + minutesSummary + '</body></html>'],
-                        { type: 'application/msword' }
-                      );
+                      // 회의록 HTML 은 그라데이션·flex·둥근모서리 등 인라인 CSS 를 쓰므로
+                      // .doc(Word) 로 받으면 스타일이 깨진다. .html 로 받아 웹에서 보던 그대로 저장.
+                      const html =
+                        '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">' +
+                        '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+                        `<title>회의록 ${schedule.title} ${format(meetingDate, 'yyyy-MM-dd')}</title>` +
+                        '<style>body{margin:0;padding:24px 16px;background:#f3f4f6;}</style>' +
+                        '</head><body>' + minutesSummary + '</body></html>';
+                      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `회의록_${schedule.title}_${format(meetingDate, 'yyyy-MM-dd')}.doc`;
+                      a.download = `회의록_${schedule.title}_${format(meetingDate, 'yyyy-MM-dd')}.html`;
                       a.click();
                       URL.revokeObjectURL(url);
                     }}
