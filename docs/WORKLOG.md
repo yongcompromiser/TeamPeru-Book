@@ -7,14 +7,13 @@
 
 ---
 
-## 0. 지금 진행 중 — 자유게시판 개편
+## 0. 자유게시판 개편 — Phase A·B 완료, C 보류
 
-- **기획 문서: [`docs/board-revamp-plan.md`](board-revamp-plan.md) 를 먼저 읽는다.**
-- 사용자 확정: **Tier 1+2+3 전부**, 비주얼 **하이브리드**(공지=상단 리스트, 일반글=포스트잇 그리드).
-- **Phase A → B → C** 순서로 각각 독립 배포. Phase A(글/댓글 수정, 공지 고정, 조회수)부터 시작.
-- 신규 마이그레이션 `011_board.sql` 로 `board_posts`/`board_comments` 정식 문서화 + 컬럼 추가 예정.
-  `board_posts`/`board_comments` 는 지금 저장소에 마이그레이션이 없다(대시보드 수동 생성).
-- 아직 실행한 board 관련 SQL 없음. Phase A 착수 시 DB 컬럼 재확인 후 진행.
+- 기획/현황 문서: [`docs/board-revamp-plan.md`](board-revamp-plan.md)
+- ✅ **Phase A**(글/댓글 수정, 공지 고정) + ✅ **Phase B**(카테고리·좋아요·검색·더보기) 배포 완료.
+  조회수는 사용자 요청으로 제거함.
+- 실행 완료 SQL: `011_board.sql`, `012_board_phase_b.sql` (둘 다 반영·검증 끝).
+- ⏸️ **Phase C(이미지·서식) 보류** — 재개 시 Supabase Storage `board` 버킷(Public) 생성 필요.
 
 ## 1. 다른 PC에서 시작하기
 
