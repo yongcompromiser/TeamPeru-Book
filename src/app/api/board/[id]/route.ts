@@ -10,9 +10,11 @@ export async function GET(
     const { id } = await params;
     const admin = createAdminClient();
 
+    // board_posts 는 profiles 와 FK 가 없어 PostgREST 임베드 조인이 안 된다.
+    // 프로필은 따로 조회해 붙인다(목록 API 와 동일한 방식).
     const { data: post } = await admin
       .from('board_posts')
-      .select('*, profile:profiles(name, avatar_url)')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -32,11 +34,25 @@ export async function GET(
 
     const { data: comments } = await admin
       .from('board_comments')
-      .select('*, profile:profiles(name, avatar_url)')
+      .select('*')
       .eq('post_id', id)
       .order('created_at', { ascending: true });
 
-    return NextResponse.json({ post, comments: comments || [] });
+    // 작성자 + 댓글 작성자 프로필 일괄 조회
+    const ids = [...new Set([post.user_id, ...(comments || []).map((c) => c.user_id)].filter(Boolean))];
+    const { data: profiles } = ids.length
+      ? await admin.from('profiles').select('id, name, avatar_url').in('id', ids)
+      : { data: [] as { id: string; name: string; avatar_url: string | null }[] };
+    const pmap = new Map((profiles || []).map((p) => [p.id, p]));
+    const attach = (uid: string) => ({
+      name: pmap.get(uid)?.name || '알 수 없음',
+      avatar_url: pmap.get(uid)?.avatar_url || null,
+    });
+
+    const postWithProfile = { ...post, profile: attach(post.user_id) };
+    const commentsWithProfile = (comments || []).map((c) => ({ ...c, profile: attach(c.user_id) }));
+
+    return NextResponse.json({ post: postWithProfile, comments: commentsWithProfile });
   } catch (error) {
     console.error('Board detail GET error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
