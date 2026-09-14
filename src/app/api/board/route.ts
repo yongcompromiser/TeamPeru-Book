@@ -13,13 +13,11 @@ export async function GET(request: Request) {
 
     const admin = createAdminClient();
 
-    // 현재 사용자 (좋아요 표시용)
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const { data: allPosts } = await admin.from('board_posts').select('*');
+    // 목록엔 제목/작성자/집계만 필요. content 는 카드에서 몇 줄만 쓰므로
+    // 앞부분만 잘라 받아 전송량을 줄인다(성능).
+    const { data: allPosts } = await admin
+      .from('board_posts')
+      .select('id, user_id, title, content, created_at, category, is_pinned');
     if (!allPosts || allPosts.length === 0) {
       return NextResponse.json({ posts: [], hasMore: false });
     }
@@ -48,23 +46,13 @@ export async function GET(request: Request) {
     const pageIds = page.map((p) => p.id);
     const userIds = [...new Set(page.map((p) => p.user_id).filter(Boolean))];
 
-    // 프로필 / 댓글수
-    const [{ data: profiles }, { data: commentRows }] = await Promise.all([
+    // 프로필 / 댓글수 / 좋아요수 — 세 쿼리를 한 번에 병렬로 (왕복 최소화)
+    // 목록에선 "내가 눌렀는지"는 필요없어 getUser 는 생략(왕복 1회 절약, 상세에서만 판정).
+    const [{ data: profiles }, { data: commentRows }, likesRes] = await Promise.all([
       admin.from('profiles').select('id, name, avatar_url').in('id', userIds),
       admin.from('board_comments').select('post_id').in('post_id', pageIds),
+      admin.from('board_post_likes').select('post_id').in('post_id', pageIds),
     ]);
-
-    // 좋아요 (테이블 없으면 무시)
-    let likeRows: { post_id: string; user_id: string }[] = [];
-    try {
-      const { data } = await admin
-        .from('board_post_likes')
-        .select('post_id, user_id')
-        .in('post_id', pageIds);
-      likeRows = data || [];
-    } catch {
-      /* board_post_likes 미존재 시 무시 */
-    }
 
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
     const commentCount = new Map<string, number>();
@@ -72,10 +60,8 @@ export async function GET(request: Request) {
       commentCount.set(c.post_id, (commentCount.get(c.post_id) || 0) + 1);
     }
     const likeCount = new Map<string, number>();
-    const likedByMe = new Set<string>();
-    for (const l of likeRows) {
+    for (const l of likesRes?.data || []) {
       likeCount.set(l.post_id, (likeCount.get(l.post_id) || 0) + 1);
-      if (user && l.user_id === user.id) likedByMe.add(l.post_id);
     }
 
     const posts = page.map((p) => ({
@@ -84,7 +70,6 @@ export async function GET(request: Request) {
       is_pinned: p.is_pinned ?? false,
       comment_count: commentCount.get(p.id) ?? 0,
       like_count: likeCount.get(p.id) ?? 0,
-      liked: likedByMe.has(p.id),
       profile: {
         name: profileMap.get(p.user_id)?.name || '알 수 없음',
         avatar_url: profileMap.get(p.user_id)?.avatar_url || null,
