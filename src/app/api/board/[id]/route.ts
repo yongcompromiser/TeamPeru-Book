@@ -10,43 +10,28 @@ export async function GET(
   try {
     const { id } = await params;
     const admin = createAdminClient();
-
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
 
-    // board_posts 는 profiles 와 FK 가 없어 PostgREST 임베드 조인이 안 된다.
-    // 프로필은 따로 조회해 붙인다(목록 API 와 동일한 방식).
-    const { data: post } = await admin
-      .from('board_posts')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // 사용자 + 글 + 좋아요 + 댓글 — 서로 독립이라 한 번에 병렬 조회
+    const [
+      { data: { user } },
+      { data: post },
+      likesRes,
+      { data: comments },
+    ] = await Promise.all([
+      supabase.auth.getUser(),
+      admin.from('board_posts').select('*').eq('id', id).single(),
+      admin.from('board_post_likes').select('user_id').eq('post_id', id),
+      admin.from('board_comments').select('*').eq('post_id', id).order('created_at', { ascending: true }),
+    ]);
 
     if (!post) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // 좋아요 수 / 내가 눌렀는지 (테이블 없으면 무시)
-    let likeCount = 0;
-    let liked = false;
-    try {
-      const { data: likes } = await admin
-        .from('board_post_likes')
-        .select('user_id')
-        .eq('post_id', id);
-      likeCount = (likes || []).length;
-      liked = !!user && (likes || []).some((l) => l.user_id === user.id);
-    } catch {
-      /* board_post_likes 미존재 시 무시 */
-    }
-
-    const { data: comments } = await admin
-      .from('board_comments')
-      .select('*')
-      .eq('post_id', id)
-      .order('created_at', { ascending: true });
+    const likes = likesRes?.data || [];
+    const likeCount = likes.length;
+    const liked = !!user && likes.some((l) => l.user_id === user.id);
 
     // 작성자 + 댓글 작성자 프로필 일괄 조회
     const ids = [...new Set([post.user_id, ...(comments || []).map((c) => c.user_id)].filter(Boolean))];

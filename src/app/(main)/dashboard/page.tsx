@@ -29,52 +29,22 @@ export default async function DashboardPage() {
   if (schedulesData && schedulesData.length > 0) {
     const schedule = schedulesData[0];
 
-    // Fetch presenter
-    let presenter = null;
-    if (schedule.presenter_id) {
-      const { data: p } = await supabase
-        .from('profiles')
-        .select('name, avatar_url')
-        .eq('id', schedule.presenter_id)
-        .single();
-      presenter = p;
-    }
-
-    // Fetch book
-    let book = null;
-    if (schedule.selected_book_id) {
-      const { data: b } = await supabase
-        .from('books')
-        .select('*')
-        .eq('id', schedule.selected_book_id)
-        .single();
-      book = b;
-    }
-
-    // Fetch submissions for this schedule (adminClient로 전체 조회)
-    const { data: submissions } = await adminClient
-      .from('meeting_submissions')
-      .select('user_id, discussion, rating, one_liner')
-      .eq('schedule_id', schedule.id);
-
-    // 제출자 프로필 별도 조회
-    if (submissions && submissions.length > 0) {
-      const userIds = submissions.map((s: any) => s.user_id);
-      const { data: profiles } = await adminClient
-        .from('profiles')
-        .select('id, name')
-        .in('id', userIds);
-      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.name]));
-      for (const s of submissions as any[]) {
-        s.profileName = profileMap.get(s.user_id) || '알 수 없음';
-      }
-    }
-
-    // Fetch all members (role = member or admin)
-    const { data: members } = await adminClient
-      .from('profiles')
-      .select('id, name, avatar_url')
-      .in('role', ['member', 'admin']);
+    // presenter / book / submissions / members — 서로 독립이라 병렬 조회
+    const [presenterRes, bookRes, { data: submissions }, { data: members }] = await Promise.all([
+      schedule.presenter_id
+        ? supabase.from('profiles').select('name, avatar_url').eq('id', schedule.presenter_id).single()
+        : Promise.resolve({ data: null }),
+      schedule.selected_book_id
+        ? supabase.from('books').select('*').eq('id', schedule.selected_book_id).single()
+        : Promise.resolve({ data: null }),
+      adminClient
+        .from('meeting_submissions')
+        .select('user_id, discussion, rating, one_liner')
+        .eq('schedule_id', schedule.id),
+      adminClient.from('profiles').select('id, name, avatar_url').in('role', ['member', 'admin']),
+    ]);
+    const presenter = presenterRes.data;
+    const book = bookRes.data;
 
     const submissionMap = new Map(
       (submissions || []).map((s: any) => [s.user_id, s])

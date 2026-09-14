@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { loadStatsData } from '@/lib/stats';
-import { listYears } from '@/lib/yearbook';
 
 // 결산이 있는 연도 목록.
 // 관리자는 전부, 정회원은 관리자가 공개로 체크한 연도만 본다.
@@ -29,13 +27,21 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const data = await loadStatsData();
-    const years = listYears(data);
+    // 연도 목록/모임수는 schedules 의 meeting_date 만 있으면 된다.
+    // (전체 통계 loadStatsData 를 부르지 않아 쿼리 수를 크게 줄임)
+    const now = Date.now();
+    const [{ data: schedRows }, { data: saved }] = await Promise.all([
+      adminClient.from('schedules').select('meeting_date'),
+      adminClient.from('year_reviews').select('year, title, theme, is_published'),
+    ]);
 
-    // 연도별 요약(모임 수)과, 사람이 쓴 결산이 있는지 여부
-    const { data: saved } = await adminClient
-      .from('year_reviews')
-      .select('year, title, theme, is_published');
+    const pastYears = (schedRows || [])
+      .filter((s) => new Date(s.meeting_date as string).getTime() <= now)
+      .map((s) => new Date(s.meeting_date as string).getFullYear());
+    const years = [...new Set(pastYears)].sort((a, b) => b - a);
+    const meetingCountByYear = new Map<number, number>();
+    for (const y of pastYears) meetingCountByYear.set(y, (meetingCountByYear.get(y) || 0) + 1);
+
     const savedMap = new Map(
       (saved ?? []).map((r) => [
         r.year as number,
@@ -54,9 +60,7 @@ export async function GET() {
       .filter((year) => isAdmin || savedMap.get(year)?.is_published === true)
       .map((year) => ({
         year,
-        meeting_count: data.pastSchedules.filter(
-          (s) => new Date(s.meeting_date as string).getFullYear() === year
-        ).length,
+        meeting_count: meetingCountByYear.get(year) ?? 0,
         title: savedMap.get(year)?.title ?? null,
         theme: savedMap.get(year)?.theme ?? null,
         is_published: savedMap.get(year)?.is_published ?? false,

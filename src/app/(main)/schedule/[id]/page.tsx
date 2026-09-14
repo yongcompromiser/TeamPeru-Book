@@ -32,20 +32,15 @@ export default function ScheduleDetailPage({ params }: ScheduleDetailPageProps) 
   }, [id, user]);
 
   const fetchData = async () => {
-    const { data: scheduleData } = await supabase
-      .from('schedules')
-      .select('*, book:books(*)')
-      .eq('id', id)
-      .single();
+    // 일정 + 참석 정보는 서로 독립이라 병렬 조회
+    const [{ data: scheduleData }, { data: attendanceData }] = await Promise.all([
+      supabase.from('schedules').select('*, book:books(*)').eq('id', id).single(),
+      supabase.from('attendances').select('*, profile:profiles(*)').eq('schedule_id', id),
+    ]);
 
     if (scheduleData) {
       setSchedule(scheduleData as Schedule);
     }
-
-    const { data: attendanceData } = await supabase
-      .from('attendances')
-      .select('*, profile:profiles(*)')
-      .eq('schedule_id', id);
 
     if (attendanceData) {
       setAttendances(attendanceData as Attendance[]);

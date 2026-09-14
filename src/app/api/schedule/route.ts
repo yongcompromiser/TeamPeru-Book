@@ -10,63 +10,51 @@ export async function GET(request: Request) {
     const currentDate = new Date(dateStr);
 
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
 
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
 
-    // 투표 조회
-    const { data: votes } = await supabase
-      .from('schedule_votes')
-      .select('*, profile:profiles(name, avatar_url)')
-      .gte('vote_date', format(start, 'yyyy-MM-dd'))
-      .lte('vote_date', format(end, 'yyyy-MM-dd'));
+    // 사용자 + 투표 + 일정 + 멤버 + 가능한 책 — 서로 독립이라 한 번에 병렬 조회
+    const [
+      { data: { user } },
+      { data: votes },
+      { data: schedulesData },
+      { data: members },
+      { data: availableBooks },
+    ] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from('schedule_votes')
+        .select('*, profile:profiles(name, avatar_url)')
+        .gte('vote_date', format(start, 'yyyy-MM-dd'))
+        .lte('vote_date', format(end, 'yyyy-MM-dd')),
+      supabase
+        .from('schedules')
+        .select('*')
+        .gte('meeting_date', start.toISOString())
+        .lte('meeting_date', end.toISOString()),
+      supabase.from('profiles').select('id, name, avatar_url'),
+      supabase.from('books').select('*').in('status', ['waiting', 'nominated', 'selected']),
+    ]);
 
-    // 일정 조회
-    const { data: schedulesData } = await supabase
-      .from('schedules')
-      .select('*')
-      .gte('meeting_date', start.toISOString())
-      .lte('meeting_date', end.toISOString());
+    // 발제자는 위에서 받은 members 로 매핑(추가 쿼리 불필요). 책만 배치 조회.
+    const memberMap = new Map((members || []).map((m: any) => [m.id, m]));
+    const schedBookIds = [...new Set((schedulesData || []).map((s: any) => s.selected_book_id).filter(Boolean))];
+    const { data: schedBooks } = schedBookIds.length
+      ? await supabase.from('books').select('id, title, author').in('id', schedBookIds)
+      : { data: [] as any[] };
+    const schedBookMap = new Map((schedBooks || []).map((b: any) => [b.id, b]));
 
-    // 일정에 presenter와 book 정보 추가
-    const schedules = schedulesData ? await Promise.all(
-      schedulesData.map(async (schedule: any) => {
-        let presenter = null;
-        let selected_book = null;
-
-        if (schedule.presenter_id) {
-          const { data: p } = await supabase
-            .from('profiles')
-            .select('name, avatar_url')
-            .eq('id', schedule.presenter_id)
-            .single();
-          presenter = p;
-        }
-
-        if (schedule.selected_book_id) {
-          const { data: b } = await supabase
-            .from('books')
-            .select('title, author')
-            .eq('id', schedule.selected_book_id)
-            .single();
-          selected_book = b;
-        }
-
-        return { ...schedule, presenter, selected_book };
-      })
-    ) : [];
-
-    // 멤버 조회
-    const { data: members } = await supabase
-      .from('profiles')
-      .select('id, name, avatar_url');
-
-    // 가능한 책 조회
-    const { data: availableBooks } = await supabase
-      .from('books')
-      .select('*')
-      .in('status', ['waiting', 'nominated', 'selected']);
+    const schedules = (schedulesData || []).map((schedule: any) => ({
+      ...schedule,
+      presenter: schedule.presenter_id
+        ? (() => {
+            const m = memberMap.get(schedule.presenter_id);
+            return m ? { name: m.name, avatar_url: m.avatar_url ?? null } : null;
+          })()
+        : null,
+      selected_book: schedule.selected_book_id ? schedBookMap.get(schedule.selected_book_id) ?? null : null,
+    }));
 
     return NextResponse.json({
       votes: votes || [],
