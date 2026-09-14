@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { exchangeKakaoCode, fetchKakaoUser } from '@/lib/kakao';
-import { storeKakaoTokens } from '@/lib/kakao-notify';
 
 function getBaseUrl(request: NextRequest): string {
   const forwardedHost = request.headers.get('x-forwarded-host');
@@ -71,8 +70,6 @@ export async function GET(request: NextRequest) {
       if (existing && existing.id !== user.id) return fail('kakao_already_linked');
 
       await admin.from('profiles').update({ kakao_id: kakaoId }).eq('id', user.id);
-      // 알림용 토큰 저장 (talk_message 동의 시 발송 가능)
-      await storeKakaoTokens(admin, user.id, tokens);
 
       const r = NextResponse.redirect(`${base}/profile?linked=kakao`);
       r.cookies.delete('kakao_oauth');
@@ -118,7 +115,7 @@ export async function GET(request: NextRequest) {
         .upsert({ id: userId, email, name: kakaoUser.nickname, kakao_id: kakaoId }, { onConflict: 'id' });
     }
 
-    // 알림용 토큰 저장 (로그인한 카카오 사용자)
+    // 게스트 역할 승격 + 초대장 참석 명단 등록
     {
       const { data: target } = await admin
         .from('profiles')
@@ -126,7 +123,6 @@ export async function GET(request: NextRequest) {
         .eq('kakao_id', kakaoId)
         .maybeSingle();
       if (target) {
-        await storeKakaoTokens(admin, target.id, tokens);
         // 게스트 참여로 처음 들어온 신규 사용자는 승인 없이 guest 역할 부여.
         // 단, 이미 member/admin 인 사용자는 절대 강등하지 않는다(pending 일 때만 승격).
         if (mode === 'guest' && target.role === 'pending') {

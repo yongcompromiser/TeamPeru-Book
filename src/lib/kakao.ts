@@ -1,14 +1,13 @@
-// 카카오 OAuth + 메시지(나에게 보내기) 직접 구현용 헬퍼 (서버 전용).
+// 카카오 OAuth(로그인) 직접 구현용 헬퍼 (서버 전용).
 //
 // Supabase 내장 카카오 provider 는 account_email 스코프를 강제해 KOE205 가 나므로
-// 카카오 API 를 직접 호출한다. 로그인은 닉네임(profile_nickname), 알림은
-// 메시지 전송(talk_message) 동의를 받아 "나에게 보내기"(메모 API)로 발송한다.
+// 카카오 API 를 직접 호출한다. 로그인 시 닉네임(profile_nickname) 동의만 받는다.
 
 const KAKAO_AUTH_BASE = 'https://kauth.kakao.com';
 const KAKAO_API_BASE = 'https://kapi.kakao.com';
 
-// 로그인 시 요청할 스코프. talk_message 는 "나에게 보내기" 알림용(선택 동의 권장).
-export const KAKAO_LOGIN_SCOPES = 'profile_nickname talk_message';
+// 로그인 시 요청할 스코프 (닉네임만).
+export const KAKAO_LOGIN_SCOPES = 'profile_nickname';
 
 export function kakaoConfigured(): boolean {
   return !!process.env.KAKAO_REST_API_KEY;
@@ -64,28 +63,6 @@ export async function exchangeKakaoCode(code: string, redirectUri: string): Prom
   return parseTokens(await res.json());
 }
 
-// refresh token 으로 access token 갱신
-export async function refreshKakaoToken(refreshToken: string): Promise<KakaoTokens> {
-  const body = new URLSearchParams({
-    grant_type: 'refresh_token',
-    client_id: process.env.KAKAO_REST_API_KEY!,
-    refresh_token: refreshToken,
-  });
-  if (process.env.KAKAO_CLIENT_SECRET) {
-    body.set('client_secret', process.env.KAKAO_CLIENT_SECRET);
-  }
-
-  const res = await fetch(`${KAKAO_AUTH_BASE}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
-    body,
-  });
-  if (!res.ok) {
-    throw new Error(`카카오 토큰 갱신 실패 (${res.status}): ${await res.text()}`);
-  }
-  return parseTokens(await res.json());
-}
-
 export interface KakaoUser {
   id: string;
   nickname: string;
@@ -105,28 +82,4 @@ export async function fetchKakaoUser(accessToken: string): Promise<KakaoUser> {
     json?.properties?.nickname ??
     '카카오사용자';
   return { id: String(json.id), nickname };
-}
-
-// "나에게 보내기"(메모 API)로 기본 텍스트 템플릿 전송.
-// text 는 최대 200자. webUrl 은 메시지 하단 버튼/링크로 연결된다.
-export async function sendKakaoMemo(accessToken: string, text: string, webUrl: string): Promise<void> {
-  const templateObject = {
-    object_type: 'text',
-    text: text.slice(0, 200),
-    link: { web_url: webUrl, mobile_web_url: webUrl },
-    button_title: '확인하기',
-  };
-  const body = new URLSearchParams({ template_object: JSON.stringify(templateObject) });
-
-  const res = await fetch(`${KAKAO_API_BASE}/v2/api/talk/memo/default/send`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-    },
-    body,
-  });
-  if (!res.ok) {
-    throw new Error(`카카오 메모 전송 실패 (${res.status}): ${await res.text()}`);
-  }
 }
