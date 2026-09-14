@@ -6,8 +6,11 @@
 const KAKAO_AUTH_BASE = 'https://kauth.kakao.com';
 const KAKAO_API_BASE = 'https://kapi.kakao.com';
 
-// 로그인 시 요청할 스코프 (닉네임만).
-export const KAKAO_LOGIN_SCOPES = 'profile_nickname';
+// 로그인 시 요청할 스코프.
+// talk_message 는 카카오 콘솔에서 필수 동의항목으로 설정돼 있을 수 있어(빼면 로그인 거부 가능),
+// 스코프 요청은 유지한다. 단, "나에게 보내기" 발송 기능 자체는 제거됨(동의만 받고 사용 안 함).
+// 완전히 빼려면 카카오 개발자콘솔에서 talk_message 동의항목을 비활성화한 뒤 여기서도 제거할 것.
+export const KAKAO_LOGIN_SCOPES = 'profile_nickname talk_message';
 
 export function kakaoConfigured(): boolean {
   return !!process.env.KAKAO_REST_API_KEY;
