@@ -214,12 +214,13 @@ export default function BooksPage() {
 
   const needsBackfillCount = books.filter((b) => !b.cover_url || !b.author?.trim()).length;
 
-  // 후보 경험은 '겹치는' 태그: 토론 완료된 책도 후보였으면 여기 포함된다.
+  // 후보 경험 = 후보에 오른 적 있으나 '아직 토론 전'인 책. 토론 완료되면 후보 경험에서 빠진다.
   const matchesStatus = (book: Book, key: BookStatus | 'all') => {
     if (key === 'all') return true;
-    if (key === 'nominated') return !!book.was_nominated;
-    if (key === 'waiting') return book.status === 'waiting' && !book.was_nominated;
-    return book.status === key; // completed
+    if (key === 'completed') return book.status === 'completed';
+    if (key === 'nominated') return !!book.was_nominated && book.status !== 'completed';
+    // waiting = 등록만 됐고 후보에 오른 적 없음
+    return book.status === 'waiting' && !book.was_nominated;
   };
 
   const filteredBooks = books.filter((book) => {
@@ -404,21 +405,23 @@ export default function BooksPage() {
                       </div>
                     )}
 
-                    {/* 상태 · 후보경험 · 분야 배지 */}
+                    {/* 상태 배지 — 토론 완료 > 후보 경험 > 대기중 (하나만) */}
+                    {(() => {
+                      const eff: BookStatus =
+                        book.status === 'completed'
+                          ? 'completed'
+                          : book.was_nominated
+                            ? 'nominated'
+                            : 'waiting';
+                      return (
                     <div className="mb-2 flex flex-wrap items-center gap-1.5">
                       <span className={cn(
                         "inline-flex px-2 py-0.5 rounded-full text-xs font-medium",
-                        BOOK_STATUS_COLORS[book.status]?.bg || 'bg-gray-100',
-                        BOOK_STATUS_COLORS[book.status]?.text || 'text-gray-700'
+                        BOOK_STATUS_COLORS[eff]?.bg || 'bg-gray-100',
+                        BOOK_STATUS_COLORS[eff]?.text || 'text-gray-700'
                       )}>
-                        {BOOK_STATUS_LABELS[book.status] || book.status}
+                        {BOOK_STATUS_LABELS[eff]}
                       </span>
-                      {/* 후보 경험은 겹치는 태그 — 대기중이 아닐 때만 별도로 덧붙인다 */}
-                      {book.was_nominated && book.status !== 'nominated' && (
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-                          후보 경험
-                        </span>
-                      )}
                       {book.category && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
                           <Tag className="w-3 h-3" />
@@ -426,6 +429,8 @@ export default function BooksPage() {
                         </span>
                       )}
                     </div>
+                      );
+                    })()}
 
                     <h3 className="font-semibold text-gray-900 truncate">{book.title}</h3>
                     <p className="text-sm text-gray-600 truncate">{book.author}</p>
