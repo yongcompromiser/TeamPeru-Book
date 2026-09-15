@@ -39,6 +39,7 @@ Supabase SQL Editor 에서 직접 돌려야 한다. 코드 배포로는 DB 구�
 | --- | --- | --- |
 | `supabase/migrations/009_meeting_arrivals.sql` | 출결·도착 시각 테이블 | 모임 출결 입력이 저장되지 않음 |
 | `supabase/migrations/010_year_reviews.sql` | 연말결산 총평·테마 | 결산 총평 저장이 안 됨 (자동 집계는 정상) |
+| `supabase/migrations/014_fix_new_user_trigger.sql` | 가입 트리거 수정 + 유령 계정 복구 | **신규 가입이 전부 실패한다** (`Database error creating new user`) |
 
 `008_book_category.sql` 은 운영 DB 에 이미 있는 컬럼을 문서로 남긴 것이라 실행하지 않아도 된다.
 
