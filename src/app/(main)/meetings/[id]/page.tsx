@@ -150,6 +150,12 @@ export default function MeetingDetailPage({ params }: PageProps) {
   const [isSavingReason, setIsSavingReason] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // 시간·장소 편집
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editMeetingTime, setEditMeetingTime] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+
   // 출결 상태
   const [arrivals, setArrivals] = useState<ArrivalRecord[]>([]);
   const [savingArrivalFor, setSavingArrivalFor] = useState<string | null>(null);
@@ -229,6 +235,34 @@ export default function MeetingDetailPage({ params }: PageProps) {
       fetchMeetingComments();
     }
   }, [id, user]);
+
+  // 시간·장소 저장. 권한(관리자·발제자)은 서버에서도 확인한다.
+  const handleSaveDetails = async () => {
+    setIsSavingDetails(true);
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_details',
+          scheduleId: id,
+          meetingTime: editMeetingTime,
+          location: editLocation,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '저장에 실패했습니다.');
+        return;
+      }
+      setIsEditingDetails(false);
+      await fetchMeetingData();
+    } catch {
+      alert('저장에 실패했습니다.');
+    } finally {
+      setIsSavingDetails(false);
+    }
+  };
 
   const fetchArrivals = async () => {
     try {
@@ -910,6 +944,79 @@ export default function MeetingDetailPage({ params }: PageProps) {
                   </span>
                 </div>
               )}
+
+              {/* 시간·장소 — 일정 화면에 가지 않고 여기서 바로 정한다 */}
+              <div className="mt-3">
+                {isEditingDetails ? (
+                  <div className="space-y-2 bg-gray-50 rounded-lg p-3">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <Clock className="w-4 h-4 text-gray-400 shrink-0" />
+                        <input
+                          type="time"
+                          value={editMeetingTime}
+                          onChange={(e) => setEditMeetingTime(e.target.value)}
+                          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                        />
+                      </label>
+                      <input
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                        placeholder="장소 (예: 용산 리얼컨퍼런스)"
+                        maxLength={120}
+                        className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSaveDetails} disabled={isSavingDetails}>
+                        {isSavingDetails ? (
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4 mr-1" />
+                        )}
+                        저장
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isSavingDetails}
+                        onClick={() => {
+                          setIsEditingDetails(false);
+                          setEditMeetingTime(schedule.meeting_time || '');
+                          setEditLocation(schedule.location || '');
+                        }}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        취소
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap text-sm text-gray-600">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      {schedule.meeting_time || <span className="text-gray-400">시간 미정</span>}
+                    </span>
+                    <span className="text-gray-300">·</span>
+                    <span>
+                      {schedule.location || <span className="text-gray-400">장소 미정</span>}
+                    </span>
+                    {canReveal && (
+                      <button
+                        onClick={() => {
+                          setEditMeetingTime(schedule.meeting_time || '');
+                          setEditLocation(schedule.location || '');
+                          setIsEditingDetails(true);
+                        }}
+                        className="text-gray-400 hover:text-gray-700"
+                        title="시간·장소 수정"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="mt-4 flex items-center gap-3">
                 {schedule.is_revealed ? (
