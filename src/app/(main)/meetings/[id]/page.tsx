@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
+import { BookSelection } from '@/components/features/book-selection';
 import {
   getVerdict,
   getLateMinutes,
@@ -967,6 +968,18 @@ export default function MeetingDetailPage({ params }: PageProps) {
 
       {/* 모임정보 탭 */}
       {activeTab === 'info' && <>
+      {/* 책 선정 — 일정 화면에 가지 않고 여기서 바로 후보·투표·선정을 한다 */}
+      {activeTab === 'info' && (
+        <BookSelection
+          scheduleId={id}
+          selectedBookId={schedule.selected_book_id}
+          canManage={canReveal}
+          canVote={profile?.role === 'member' || profile?.role === 'admin'}
+          currentUserId={user?.id}
+          onChanged={fetchMeetingData}
+        />
+      )}
+
       {/* 게스트 공개 초대 (관리자 전용) */}
       {isAdmin && (
         <Card>
