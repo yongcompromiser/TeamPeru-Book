@@ -37,6 +37,17 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // 회의록은 관리자만 작성·수정할 수 있다. (adminClient 는 RLS 를 우회하므로
+    // 여기서 권한을 직접 확인하지 않으면 로그인한 누구나 덮어쓸 수 있다.)
+    const { data: me } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (me?.role !== 'admin') {
+      return NextResponse.json({ error: '관리자만 회의록을 수정할 수 있습니다.' }, { status: 403 });
+    }
+
     const { raw_text, summary } = await request.json();
 
     // 기존 회의록 확인

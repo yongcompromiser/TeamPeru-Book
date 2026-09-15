@@ -1854,7 +1854,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
                     <Download className="w-4 h-4" />
                     다운로드
                   </button>
-                  {(isAdmin || isPresenter) && (
+                  {isAdmin && (
                     <button
                       onClick={() => setIsEditingMinutes(!isEditingMinutes)}
                       className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
@@ -1896,7 +1896,8 @@ export default function MeetingDetailPage({ params }: PageProps) {
           </Card>
         )}
 
-        {/* STT 원문 (접기/펼치기) */}
+        {/* STT 원문 편집 (관리자 전용 — 회의록 정리 작업용) */}
+        {isAdmin && (
         <Card>
           <CardHeader>
             <button
@@ -1924,6 +1925,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
             </CardContent>
           )}
         </Card>
+        )}
         </>
         )
       )}
