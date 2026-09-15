@@ -37,6 +37,15 @@ export async function POST(request: Request) {
         console.error('Add candidate error:', error);
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
+
+      // 후보로 오른 적이 있으면 '후보 경험'으로 표시 (이미 토론 완료면 유지)
+      const admin = createAdminClient();
+      await admin
+        .from('books')
+        .update({ status: 'nominated' })
+        .eq('id', bookId)
+        .eq('status', 'waiting');
+
       return NextResponse.json({ success: true });
     }
 
@@ -118,8 +127,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: scheduleError.message }, { status: 400 });
       }
 
-      // 책 상태도 admin 으로. books 역시 RLS 에 걸려 조용히 실패할 수 있다.
-      await admin.from('books').update({ status: 'selected' }).eq('id', bookId);
+      // 선정된 책은 '후보 경험'으로 표시(토론 완료 전까지). 모임 공개 시 '토론 완료'로 바뀐다.
+      // books 역시 RLS 에 걸려 조용히 실패할 수 있어 admin 으로. 완료된 책은 되돌리지 않는다.
+      await admin
+        .from('books')
+        .update({ status: 'nominated' })
+        .eq('id', bookId)
+        .neq('status', 'completed');
 
       return NextResponse.json({ success: true });
     }

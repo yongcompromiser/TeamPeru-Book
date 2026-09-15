@@ -69,13 +69,18 @@ export default async function DashboardPage() {
   let featuredPresenter = nextSchedule?.presenter;
 
   if (!featuredBook) {
-    const { data: booksData } = await supabase
-      .from('books')
-      .select('*')
-      .eq('status', 'selected')
-      .order('created_at', { ascending: false })
+    // 예정 모임이 없으면 가장 최근 모임에서 다룬 책을 대신 보여준다.
+    const { data: latestSched } = await supabase
+      .from('schedules')
+      .select('selected_book_id')
+      .not('selected_book_id', 'is', null)
+      .order('meeting_date', { ascending: false })
       .limit(1);
-    featuredBook = booksData?.[0] || null;
+    const bid = latestSched?.[0]?.selected_book_id;
+    if (bid) {
+      const { data: b } = await supabase.from('books').select('*').eq('id', bid).single();
+      featuredBook = b || null;
+    }
   }
 
   return (

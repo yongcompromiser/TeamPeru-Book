@@ -260,7 +260,7 @@ export default function BookDetailPage({ params }: PageProps) {
                   </div>
                 )}
                 {!isEditingTitle && (
-                  <Badge variant={book.status === 'completed' ? 'success' : book.status === 'selected' ? 'info' : 'default'}>
+                  <Badge variant={book.status === 'completed' ? 'success' : book.status === 'nominated' ? 'warning' : 'default'}>
                     {BOOK_STATUS_LABELS[book.status as keyof typeof BOOK_STATUS_LABELS] || book.status}
                   </Badge>
                 )}

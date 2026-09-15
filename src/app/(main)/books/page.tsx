@@ -25,11 +25,21 @@ const STATUS_FILTERS: { value: BookStatus | 'all'; label: string }[] = [
   { value: 'all', label: '전체' },
   { value: 'waiting', label: '대기중' },
   { value: 'nominated', label: '후보 경험' },
-  { value: 'selected', label: '선정됨' },
   { value: 'completed', label: '토론 완료' },
 ];
 
-const ALL_STATUSES: BookStatus[] = ['waiting', 'nominated', 'selected', 'completed'];
+const ALL_STATUSES: BookStatus[] = ['waiting', 'nominated', 'completed'];
+
+// 기본 정렬: 대기중 → 후보 경험 → 토론 완료, 각 그룹 안에서는 최신순
+const STATUS_ORDER: Record<string, number> = { waiting: 0, nominated: 1, completed: 2 };
+function sortBooks(list: Book[]): Book[] {
+  return [...list].sort((a, b) => {
+    const sa = STATUS_ORDER[a.status] ?? 9;
+    const sb = STATUS_ORDER[b.status] ?? 9;
+    if (sa !== sb) return sa - sb;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
+}
 
 export default function BooksPage() {
   const supabase = createClient();
@@ -54,7 +64,7 @@ export default function BooksPage() {
       const res = await fetch('/api/books');
       if (res.ok) {
         const data = await res.json();
-        setBooks(data.books || []);
+        setBooks(sortBooks(data.books || []));
         setIsLoading(false);
         return;
       }
@@ -68,7 +78,7 @@ export default function BooksPage() {
       .select('id, title, author, cover_url, status, category, created_at')
       .order('created_at', { ascending: false });
 
-    setBooks(data || []);
+    setBooks(sortBooks(data || []));
     setIsLoading(false);
   };
 
@@ -79,9 +89,9 @@ export default function BooksPage() {
       .eq('id', bookId);
 
     if (!error) {
-      setBooks(books.map(book =>
+      setBooks(sortBooks(books.map(book =>
         book.id === bookId ? { ...book, status: newStatus } : book
-      ));
+      )));
     }
     setEditingBookId(null);
   };

@@ -35,7 +35,7 @@ export async function GET(request: Request) {
         .gte('meeting_date', start.toISOString())
         .lte('meeting_date', end.toISOString()),
       supabase.from('profiles').select('id, name, avatar_url'),
-      supabase.from('books').select('*').in('status', ['waiting', 'nominated', 'selected']),
+      supabase.from('books').select('*').in('status', ['waiting', 'nominated']),
     ]);
 
     // 발제자는 위에서 받은 members 로 매핑(추가 쿼리 불필요). 책만 배치 조회.
