@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/utils';
 import { Calendar, BookOpen, User } from 'lucide-react';
 import Link from 'next/link';
 import { BookVoteCard } from '@/components/features/book-vote-card';
+import { BookShelfMarquee } from '@/components/features/book-shelf-marquee';
 import { Avatar } from '@/components/ui/avatar';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,15 @@ export const dynamic = 'force-dynamic';
 export default async function DashboardPage() {
   const supabase = await createClient();
   const adminClient = createAdminClient();
+
+  // 읽은 책(토론 완료) 표지 — 트로피 선반 마퀴용
+  const { data: readBooks } = await adminClient
+    .from('books')
+    .select('id, title, cover_url')
+    .eq('status', 'completed')
+    .not('cover_url', 'is', null)
+    .order('created_at', { ascending: false });
+  const shelf = (readBooks || []).filter((b: any) => b.cover_url);
 
   // Fetch next upcoming schedule (당일 자정까지 표시)
   const today = new Date();
@@ -85,24 +95,17 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Hero — 움직이는 그라데이션 + 둥둥 떠다니는 책 */}
-      <div
-        className="animate-gradient animate-fade-up relative overflow-hidden rounded-2xl p-8 sm:p-10 text-white shadow-sm"
-        style={{ backgroundImage: 'linear-gradient(120deg, #1e3a5f, #6d28d9, #2563eb, #0ea5e9, #6d28d9, #1e3a5f)' }}
-      >
-        <span className="animate-float pointer-events-none absolute top-6 right-8 select-none text-4xl">📚</span>
-        <span className="animate-pulse-soft pointer-events-none absolute bottom-6 right-24 select-none text-2xl">✨</span>
-        <span className="animate-float-slow pointer-events-none absolute top-12 right-44 hidden select-none text-2xl opacity-80 sm:block">📖</span>
-        <div className="relative">
-          <p className="text-sm font-medium text-white/80">팀 페루 독서토론</p>
-          <h1 className="mt-1 text-2xl font-bold sm:text-3xl">함께 읽고, 나누는 즐거움 📖</h1>
-          <p className="mt-2 text-sm text-white/85 sm:text-base">
-            {nextSchedule
-              ? `다음 모임 · ${formatDate(nextSchedule.meeting_date, { month: 'long', day: 'numeric', weekday: 'long' })}`
-              : '다음 모임을 함께 준비해봐요'}
-          </p>
+      {/* 읽은 책 표지가 옆으로 흐르는 트로피 선반 */}
+      {shelf.length > 0 ? (
+        <BookShelfMarquee books={shelf} />
+      ) : (
+        <div
+          className="animate-fade-up rounded-2xl px-6 py-8 text-center text-white shadow-sm"
+          style={{ backgroundImage: 'linear-gradient(160deg, #241a37, #15111f)' }}
+        >
+          <p className="text-sm text-white/70">함께 읽은 책이 쌓이면 여기 선반에 표지가 흐릅니다 📚</p>
         </div>
-      </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Next Meeting */}

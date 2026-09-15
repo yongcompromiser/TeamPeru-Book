@@ -7,12 +7,38 @@ export async function GET() {
   try {
     const supabase = await createClient();
 
-    const { data: books } = await supabase
-      .from('books')
-      .select('*, created_by_profile:profiles!books_created_by_fkey(name, avatar_url)')
-      .order('created_at', { ascending: false });
+    // 책 + 후보 이력(schedule_book_candidates) + 선정/토론 일자(schedules) 병렬 조회
+    const [{ data: books }, candRes, { data: scheds }] = await Promise.all([
+      supabase
+        .from('books')
+        .select('*, created_by_profile:profiles!books_created_by_fkey(name, avatar_url)')
+        .order('created_at', { ascending: false }),
+      supabase.from('schedule_book_candidates').select('book_id'),
+      supabase.from('schedules').select('selected_book_id, meeting_date').not('selected_book_id', 'is', null),
+    ]);
 
-    return NextResponse.json({ books: books || [] });
+    // 후보 경험: 한 번이라도 후보로 올랐거나 선정된 적 있는 책 (겹치는 태그 개념)
+    const nominatedSet = new Set<string>();
+    for (const c of candRes.data || []) if (c.book_id) nominatedSet.add(c.book_id);
+    for (const s of scheds || []) if (s.selected_book_id) nominatedSet.add(s.selected_book_id);
+
+    // 토론 일자: 그 책이 선정된 모임의 가장 최근 meeting_date
+    const discussedAt = new Map<string, string>();
+    for (const s of scheds || []) {
+      const bid = s.selected_book_id as string;
+      const md = s.meeting_date as string;
+      if (!bid || !md) continue;
+      const prev = discussedAt.get(bid);
+      if (!prev || new Date(md).getTime() > new Date(prev).getTime()) discussedAt.set(bid, md);
+    }
+
+    const enriched = (books || []).map((b: any) => ({
+      ...b,
+      was_nominated: nominatedSet.has(b.id),
+      discussed_at: discussedAt.get(b.id) ?? null,
+    }));
+
+    return NextResponse.json({ books: enriched });
   } catch (error) {
     console.error('Books API error:', error);
     return NextResponse.json({ books: [] });

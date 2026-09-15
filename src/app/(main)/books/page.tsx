@@ -19,6 +19,8 @@ interface Book {
   status: BookStatus;
   category?: string | null;
   created_at?: string;
+  was_nominated?: boolean; // 후보에 한 번이라도 오른 적 있음(파생)
+  discussed_at?: string | null; // 토론한 모임 날짜(파생), 없으면 null
 }
 
 const STATUS_FILTERS: { value: BookStatus | 'all'; label: string }[] = [
@@ -28,15 +30,15 @@ const STATUS_FILTERS: { value: BookStatus | 'all'; label: string }[] = [
   { value: 'completed', label: '토론 완료' },
 ];
 
-const ALL_STATUSES: BookStatus[] = ['waiting', 'nominated', 'completed'];
+// 후보 경험은 파생 태그라 관리자가 직접 지정하지 않는다. 상태는 대기중/토론 완료만.
+const ALL_STATUSES: BookStatus[] = ['waiting', 'completed'];
 
-// 기본 정렬: 대기중 → 후보 경험 → 토론 완료, 각 그룹 안에서는 최신순
-const STATUS_ORDER: Record<string, number> = { waiting: 0, nominated: 1, completed: 2 };
+// 기본 정렬: 최근 토론한 책 우선(토론 일자 최신순), 토론 안 한 책은 뒤로(등록 최신순).
 function sortBooks(list: Book[]): Book[] {
   return [...list].sort((a, b) => {
-    const sa = STATUS_ORDER[a.status] ?? 9;
-    const sb = STATUS_ORDER[b.status] ?? 9;
-    if (sa !== sb) return sa - sb;
+    const da = a.discussed_at ? new Date(a.discussed_at).getTime() : -1;
+    const db = b.discussed_at ? new Date(b.discussed_at).getTime() : -1;
+    if (da !== db) return db - da; // 토론 일자 최신순 (없으면 뒤로)
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
 }
@@ -212,8 +214,16 @@ export default function BooksPage() {
 
   const needsBackfillCount = books.filter((b) => !b.cover_url || !b.author?.trim()).length;
 
+  // 후보 경험은 '겹치는' 태그: 토론 완료된 책도 후보였으면 여기 포함된다.
+  const matchesStatus = (book: Book, key: BookStatus | 'all') => {
+    if (key === 'all') return true;
+    if (key === 'nominated') return !!book.was_nominated;
+    if (key === 'waiting') return book.status === 'waiting' && !book.was_nominated;
+    return book.status === key; // completed
+  };
+
   const filteredBooks = books.filter((book) => {
-    if (filter !== 'all' && book.status !== filter) return false;
+    if (!matchesStatus(book, filter)) return false;
     if (categoryFilter === 'all') return true;
     // '분야 없음'은 아직 분류하지 않은 책을 모아보기 위한 항목
     if (categoryFilter === 'none') return !book.category;
@@ -229,16 +239,16 @@ export default function BooksPage() {
 
   const getStatusCounts = () => {
     const counts: Record<string, number> = { all: categoryScoped.length };
-    categoryScoped.forEach((book) => {
-      counts[book.status] = (counts[book.status] || 0) + 1;
-    });
+    for (const key of ['waiting', 'nominated', 'completed'] as BookStatus[]) {
+      counts[key] = categoryScoped.filter((b) => matchesStatus(b, key)).length;
+    }
     return counts;
   };
 
   const statusCounts = getStatusCounts();
 
   // 분야 탭에 붙일 개수는 현재 상태 필터를 반영한다.
-  const statusScoped = filter === 'all' ? books : books.filter((b) => b.status === filter);
+  const statusScoped = filter === 'all' ? books : books.filter((b) => matchesStatus(b, filter));
   const categoryCounts = new Map<string, number>();
   for (const b of statusScoped) {
     const key = b.category || 'none';
@@ -394,7 +404,7 @@ export default function BooksPage() {
                       </div>
                     )}
 
-                    {/* 상태 · 분야 배지 */}
+                    {/* 상태 · 후보경험 · 분야 배지 */}
                     <div className="mb-2 flex flex-wrap items-center gap-1.5">
                       <span className={cn(
                         "inline-flex px-2 py-0.5 rounded-full text-xs font-medium",
@@ -403,6 +413,12 @@ export default function BooksPage() {
                       )}>
                         {BOOK_STATUS_LABELS[book.status] || book.status}
                       </span>
+                      {/* 후보 경험은 겹치는 태그 — 대기중이 아닐 때만 별도로 덧붙인다 */}
+                      {book.was_nominated && book.status !== 'nominated' && (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                          후보 경험
+                        </span>
+                      )}
                       {book.category && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
                           <Tag className="w-3 h-3" />

@@ -80,6 +80,18 @@ select {
   pointer-events: none;
 }
 
+/* 읽은 책 표지가 옆으로 흐르는 트로피 선반 (목록 2배 → -50% 이동으로 무한 반복) */
+@keyframes bookMarquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-book-marquee {
+  animation: bookMarquee 60s linear infinite;
+}
+.animate-book-marquee:hover {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-float-slow,
@@ -87,8 +99,12 @@ select {
   .animate-blob,
   .animate-fade-up,
   .animate-gradient,
+  .animate-book-marquee,
   .shimmer-band::after {
     animation: none !important;
+  }
+  .animate-book-marquee {
+    overflow-x: auto;
   }
 }
 

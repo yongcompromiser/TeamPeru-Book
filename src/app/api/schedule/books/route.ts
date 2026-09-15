@@ -37,15 +37,7 @@ export async function POST(request: Request) {
         console.error('Add candidate error:', error);
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
-
-      // 후보로 오른 적이 있으면 '후보 경험'으로 표시 (이미 토론 완료면 유지)
-      const admin = createAdminClient();
-      await admin
-        .from('books')
-        .update({ status: 'nominated' })
-        .eq('id', bookId)
-        .eq('status', 'waiting');
-
+      // '후보 경험'은 별도 상태로 저장하지 않고 schedule_book_candidates 존재로 파생한다.
       return NextResponse.json({ success: true });
     }
 
@@ -126,15 +118,8 @@ export async function POST(request: Request) {
       if (scheduleError) {
         return NextResponse.json({ error: scheduleError.message }, { status: 400 });
       }
-
-      // 선정된 책은 '후보 경험'으로 표시(토론 완료 전까지). 모임 공개 시 '토론 완료'로 바뀐다.
-      // books 역시 RLS 에 걸려 조용히 실패할 수 있어 admin 으로. 완료된 책은 되돌리지 않는다.
-      await admin
-        .from('books')
-        .update({ status: 'nominated' })
-        .eq('id', bookId)
-        .neq('status', 'completed');
-
+      // 선정 사실은 schedules.selected_book_id 로 남고, '후보 경험'은 거기서 파생한다.
+      // 책 상태(waiting/completed)는 모임 공개 시 'completed' 로만 바뀐다.
       return NextResponse.json({ success: true });
     }
 
