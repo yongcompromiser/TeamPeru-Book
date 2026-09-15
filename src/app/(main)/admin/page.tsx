@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield, Check, X, Clock, Trash2, UserPlus } from 'lucide-react';
+import { Users, BookOpen, Calendar, MessageSquare, PenTool, Camera, Shield, Check, X, Clock, Trash2, UserPlus, Link2 } from 'lucide-react';
 import { Profile } from '@/types';
 
 type RoleType = 'admin' | 'member' | 'visitor' | 'pending' | 'guest';
@@ -48,6 +48,25 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<ProfileWithRole | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [copiedUserId, setCopiedUserId] = useState('');
+
+  // 승인해도 본인에게 알림이 가지 않는다. 승인 뒤 카톡으로 보낼 안내문을 통째로 복사해준다.
+  const copyApprovalGuide = async (user: ProfileWithRole) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const text = [
+      `[팀 페루] ${user.name}님, 가입이 승인되었습니다 🎉`,
+      '',
+      '아래 주소에서 가입할 때 쓰신 이메일과 비밀번호로 로그인하시면 됩니다.',
+      `${origin}/login`,
+    ].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedUserId(user.id);
+      setTimeout(() => setCopiedUserId(''), 2000);
+    } catch {
+      alert(text);
+    }
+  };
 
   const isAdmin = profile?.role === 'admin';
 
@@ -177,6 +196,16 @@ export default function AdminPage() {
                     >
                       <Check className="w-4 h-4 mr-1" />
                       승인
+                    </Button>
+                    {/* 승인해도 본인에게 알림이 가지 않아, 보낼 안내문을 복사해 쓴다 */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      title="승인 안내문 복사"
+                      onClick={() => copyApprovalGuide(user)}
+                    >
+                      <Link2 className="w-4 h-4 mr-1" />
+                      {copiedUserId === user.id ? '복사됨' : '안내문'}
                     </Button>
                     <Button
                       size="sm"

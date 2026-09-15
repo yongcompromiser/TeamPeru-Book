@@ -395,8 +395,20 @@ export default function InvitePage({ params }: PageProps) {
                       <Check className="w-5 h-5 text-emerald-400" />
                     </div>
                     <p className="font-bold text-amber-50 text-sm">가입 신청 완료!</p>
-                    <p className="text-xs text-stone-400 mt-1">
-                      관리자가 확인한 뒤 입장할 수 있어요. 승인되면 로그인해주세요.
+                    <p className="text-xs text-stone-400 mt-1 leading-relaxed">
+                      관리자가 확인한 뒤 입장할 수 있어요.
+                      <br />
+                      승인되면 아래에서 방금 쓴 이메일·비밀번호로 로그인하세요.
+                    </p>
+                    {/* 승인 알림이 따로 가지 않으니, 나중에 다시 올 주소를 지금 알려준다 */}
+                    <a
+                      href="/login"
+                      className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-semibold text-amber-100 transition-colors hover:bg-amber-500/20"
+                    >
+                      로그인 페이지로 가기
+                    </a>
+                    <p className="text-[11px] text-stone-500 mt-2">
+                      지금 로그인하면 승인될 때까지 대기 화면이 뜨고, 승인되는 즉시 자동으로 넘어가요.
                     </p>
                   </div>
                 ) : !emailOpen ? null : (
