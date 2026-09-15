@@ -150,3 +150,56 @@ select {
     transform: none !important;
   }
 }
+
+/* ─────────── 초대장(책 열기) 연출 ─────────── */
+
+/* 공기 중 먼지가 천천히 떠다닌다 */
+@keyframes dustDrift {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0; }
+  10%  { opacity: 0.55; }
+  90%  { opacity: 0.35; }
+  100% { transform: translate(28px, -120px) scale(1.25); opacity: 0; }
+}
+
+/* 촛불처럼 은은하게 흔들리는 광원 */
+@keyframes emberGlow {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  40%      { opacity: 0.7;  transform: scale(1.06); }
+  70%      { opacity: 0.55; transform: scale(0.98); }
+}
+
+/* 책 표지가 왼쪽 경첩을 축으로 열린다 */
+@keyframes coverOpen {
+  0%   { transform: rotateY(0deg); }
+  100% { transform: rotateY(-168deg); }
+}
+
+/* 펼쳐진 지면이 올라오며 나타난다 */
+@keyframes pageRise {
+  0%   { opacity: 0; transform: translateY(24px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 닫힌 책이 숨 쉬듯 아주 조금 움직인다 */
+@keyframes bookIdle {
+  0%, 100% { transform: translateY(0) rotateZ(0deg); }
+  50%      { transform: translateY(-8px) rotateZ(-0.4deg); }
+}
+
+.animate-dust { animation: dustDrift linear infinite; }
+.animate-ember { animation: emberGlow 5s ease-in-out infinite; }
+.animate-cover-open { animation: coverOpen 1.15s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+.animate-page-rise { animation: pageRise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-book-idle { animation: bookIdle 6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dust,
+  .animate-ember,
+  .animate-cover-open,
+  .animate-page-rise,
+  .animate-book-idle {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
