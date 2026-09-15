@@ -151,6 +151,18 @@ export async function GET(
         .eq('schedule_id', id)
         .order('created_at', { ascending: false });
       rsvps = rsvpData || [];
+
+      // 신청자가 지금 어떤 상태인지(게스트로 바로 들어왔는지, 승인 대기인지) 같이 내려준다.
+      // 이게 없으면 관리자 입장에서 "신청은 들어왔는데 승인할 데가 없다"로 보인다.
+      const rsvpUserIds = [...new Set(rsvps.map((r) => r.user_id).filter(Boolean))];
+      if (rsvpUserIds.length > 0) {
+        const { data: rsvpProfiles } = await adminClient
+          .from('profiles')
+          .select('id, role')
+          .in('id', rsvpUserIds);
+        const roleById = new Map((rsvpProfiles || []).map((p) => [p.id, p.role]));
+        rsvps = rsvps.map((r) => ({ ...r, role: r.user_id ? roleById.get(r.user_id) ?? null : null }));
+      }
     }
 
     return NextResponse.json({

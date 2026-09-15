@@ -88,7 +88,18 @@ interface Rsvp {
   message: string | null;
   status: string;
   created_at: string;
+  /** 신청자의 현재 계정 상태. 카카오 게스트 참여는 승인 없이 바로 guest 가 된다. */
+  role: 'admin' | 'member' | 'guest' | 'pending' | 'visitor' | null;
 }
+
+/** 참석 신청자 상태 뱃지 문구·색 */
+const RSVP_ROLE_LABEL: Record<string, { text: string; cls: string }> = {
+  admin: { text: '관리자', cls: 'bg-blue-100 text-blue-700' },
+  member: { text: '멤버', cls: 'bg-green-100 text-green-700' },
+  guest: { text: '게스트 · 승인 불필요', cls: 'bg-amber-100 text-amber-700' },
+  pending: { text: '가입 승인 대기', cls: 'bg-yellow-200 text-yellow-900' },
+  visitor: { text: '방문자', cls: 'bg-gray-100 text-gray-600' },
+};
 
 interface Comment {
   id: string;
@@ -1152,10 +1163,22 @@ export default function MeetingDetailPage({ params }: PageProps) {
                   {rsvps.map((r) => (
                     <div key={r.id} className="flex items-start justify-between gap-3 bg-amber-50/60 rounded-lg px-3 py-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-gray-900 flex items-center gap-1.5 flex-wrap">
                           {r.name}
-                          {r.contact && <span className="ml-2 text-xs font-normal text-gray-500">{r.contact}</span>}
+                          {r.role && RSVP_ROLE_LABEL[r.role] && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${RSVP_ROLE_LABEL[r.role].cls}`}
+                            >
+                              {RSVP_ROLE_LABEL[r.role].text}
+                            </span>
+                          )}
+                          {r.contact && <span className="text-xs font-normal text-gray-500">{r.contact}</span>}
                         </p>
+                        {r.role === 'pending' && (
+                          <p className="text-[11px] text-yellow-700 mt-0.5">
+                            관리자 페이지의 &lsquo;가입 승인 대기&rsquo;에서 승인해주세요.
+                          </p>
+                        )}
                         {r.message && <p className="text-xs text-gray-600 mt-0.5 break-words">{r.message}</p>}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
