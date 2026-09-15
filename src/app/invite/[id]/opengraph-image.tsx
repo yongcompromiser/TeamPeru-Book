@@ -102,30 +102,89 @@ export default async function Image({ params }: { params: { id: string } }) {
           width: '100%',
           height: '100%',
           display: 'flex',
-          background: 'linear-gradient(135deg, #1a1208 0%, #2c1d0b 55%, #14100a 100%)',
-          padding: 72,
-          alignItems: 'center',
-          gap: 56,
+          position: 'relative',
+          // 초대 화면과 같은 블랙&우드 톤
+          background: '#0d0a07',
           fontFamily: font ? 'NotoKR' : undefined,
         }}
       >
+        {/* 나무 결 */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            background:
+              'repeating-linear-gradient(94deg, #1a1208 0px, #241a0e 6px, #17100a 14px, #1e150c 22px)',
+            opacity: 0.55,
+          }}
+        />
+        {/* 위에서 내려오는 광원 */}
+        <div
+          style={{
+            position: 'absolute',
+            top: -320,
+            left: 300,
+            width: 800,
+            height: 800,
+            display: 'flex',
+            borderRadius: 400,
+            background: 'radial-gradient(circle, rgba(251,191,36,0.22) 0%, transparent 62%)',
+          }}
+        />
+        {/* 금박 테두리 */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 26,
+            display: 'flex',
+            border: '2px solid rgba(245,158,11,0.38)',
+            borderRadius: 10,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 34,
+            display: 'flex',
+            border: '1px solid rgba(245,158,11,0.16)',
+            borderRadius: 6,
+          }}
+        />
+
+        <div
+          style={{
+            display: 'flex',
+            width: '100%',
+            height: '100%',
+            padding: 80,
+            alignItems: 'center',
+            gap: 56,
+          }}
+        >
         {/* 책 표지 */}
         {isPublic && cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={cover}
             alt=""
-            width={280}
-            height={420}
-            style={{ objectFit: 'cover', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.6)' }}
+            width={276}
+            height={414}
+            style={{
+              objectFit: 'cover',
+              borderRadius: 10,
+              boxShadow: '0 26px 70px rgba(0,0,0,.8)',
+              border: '1px solid rgba(245,158,11,0.3)',
+            }}
           />
         ) : (
           <div
             style={{
-              width: 280,
-              height: 420,
-              borderRadius: 16,
-              background: 'linear-gradient(135deg, #f59e0b, #b45309)',
+              width: 276,
+              height: 414,
+              borderRadius: 10,
+              background: 'linear-gradient(140deg, #3b2a16 0%, #241809 60%, #1a1207 100%)',
+              border: '1px solid rgba(245,158,11,0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -138,7 +197,10 @@ export default async function Image({ params }: { params: { id: string } }) {
 
         {/* 본문 */}
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <div style={{ display: 'flex', fontSize: 26, color: '#fbbf24', letterSpacing: 6 }}>
+          <div style={{ display: 'flex', fontSize: 24, color: '#d97706', letterSpacing: 10 }}>
+            INVITATION
+          </div>
+          <div style={{ display: 'flex', fontSize: 24, color: '#fbbf24', marginTop: 8 }}>
             팀 페루 독서토론
           </div>
 
@@ -186,6 +248,7 @@ export default async function Image({ params }: { params: { id: string } }) {
           >
             초대장 열어보기 →
           </div>
+        </div>
         </div>
       </div>
     ),
