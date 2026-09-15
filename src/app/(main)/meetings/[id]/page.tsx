@@ -753,20 +753,11 @@ export default function MeetingDetailPage({ params }: PageProps) {
         setIsRevealing(false);
         return;
       }
-    } catch (e) {
-      console.log('API reveal failed, trying direct');
-      // API 실패시 직접 호출
-      if (schedule.selected_book_id) {
-        await supabase
-          .from('books')
-          .update({ status: 'completed' })
-          .eq('id', schedule.selected_book_id);
-      }
-
-      await supabase
-        .from('schedules')
-        .update({ is_revealed: true })
-        .eq('id', schedule.id);
+    } catch {
+      // 직접 쓰기로 넘어가지 않는다. schedules·books 의 RLS 는 UPDATE 를 관리자에게만
+      // 허용해서, 발제자(member)가 직접 쓰면 0행이 수정되는데 에러도 나지 않는다.
+      // 그러면 공개되지 않았는데 공개된 것처럼 보인다.
+      alert('공개 요청을 보내지 못했습니다. 새로고침 후 다시 시도해주세요.');
     }
 
     await fetchMeetingData();

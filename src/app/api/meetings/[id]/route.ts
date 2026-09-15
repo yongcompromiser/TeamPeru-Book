@@ -207,16 +207,19 @@ export async function PATCH(
         return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 });
       }
 
-      // 책 상태 업데이트
+      // schedules·books 의 RLS 는 UPDATE 를 관리자에게만 허용한다.
+      // 사용자 클라이언트로 쓰면 발제자(member)일 때 0행이 수정되는데 에러가 나지 않아
+      // '공개했습니다'만 뜨고 실제로는 공개되지 않는다. 권한은 바로 위에서 확인했으므로
+      // admin 으로 쓴다. (select_book / update_details 와 같은 이유)
       if (schedule?.selected_book_id) {
-        await supabase
+        await adminClient
           .from('books')
           .update({ status: 'completed' })
           .eq('id', schedule.selected_book_id);
       }
 
       // 모임 공개 처리
-      const { error } = await supabase
+      const { error } = await adminClient
         .from('schedules')
         .update({ is_revealed: true })
         .eq('id', id);
