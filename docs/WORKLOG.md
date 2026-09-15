@@ -43,6 +43,27 @@ Supabase SQL Editor 에서 직접 돌려야 한다. 코드 배포로는 DB 구�
 
 `008_book_category.sql` 은 운영 DB 에 이미 있는 컬럼을 문서로 남긴 것이라 실행하지 않아도 된다.
 
+### Supabase 대시보드에서 해야 할 설정 (가입 승인 메일)
+
+코드 배포만으로는 메일이 나가지 않는다. 별도 메일 서비스를 쓰지 않고
+Supabase Auth 의 SMTP 로 보내기 때문에 대시보드 설정이 전제다.
+
+1. **Authentication → SMTP Settings**: Custom SMTP 를 켠다.
+   기본 내장 메일은 시간당 2~4통 + 프로젝트 멤버 주소로만 가는 제약이 있어 실전에서 못 쓴다.
+2. **Authentication → URL Configuration**: Site URL 을 `https://teamperu-book.vercel.app` 으로,
+   Redirect URLs 에 `https://teamperu-book.vercel.app/auth/confirm` 을 추가한다.
+3. **Authentication → Email Templates → Magic Link**: 본문을 승인 안내용으로 바꾸고
+   링크를 아래 형태로 만든다. code 방식(`{{ .ConfirmationURL }}`)은 PKCE 검증자가
+   발송한 브라우저 쿠키에 있어야 해서, 상대방 기기에서 열면 반드시 깨진다.
+   ```
+   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink
+   ```
+
+이 앱은 다른 곳에서 매직링크를 쓰지 않으므로 템플릿을 승인 안내 전용으로 써도 된다.
+(카카오 로그인은 `generateLink` 로 링크만 만들고 메일을 보내지 않는다.)
+메일 발송이 실패해도 승인 자체는 완료되며, 관리자 화면에 사유가 배너로 뜬다.
+그때는 '안내문' 버튼으로 문구를 복사해 직접 보내면 된다.
+
 ## 3. 화면별 공개 범위
 
 | 화면 | 범위 |

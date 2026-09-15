@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sendApprovalEmail, type MailResult } from '@/lib/approval-mail';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function PATCH(request: NextRequest) {
@@ -24,6 +25,13 @@ export async function PATCH(request: NextRequest) {
 
     const { userId, role } = await request.json();
 
+    // 승인 메일을 보낼지 판단하려면 바꾸기 "전" 역할이 필요하다
+    const { data: before } = await adminClient
+      .from('profiles')
+      .select('role, email')
+      .eq('id', userId)
+      .maybeSingle();
+
     const { error } = await adminClient
       .from('profiles')
       .update({ role })
@@ -33,7 +41,19 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    // 승인 대기 → 입장 가능으로 바뀐 순간에만 안내 메일을 보낸다.
+    // 메일 발송이 실패해도 승인 자체는 이미 끝났으므로 되돌리지 않고, 결과만 알려준다.
+    let mail: MailResult | null = null;
+    if (before?.role === 'pending' && role !== 'pending' && before.email) {
+      const forwardedHost = request.headers.get('x-forwarded-host');
+      const origin =
+        process.env.NODE_ENV !== 'development' && forwardedHost
+          ? `https://${forwardedHost}`
+          : request.nextUrl.origin;
+      mail = await sendApprovalEmail(before.email, origin);
+    }
+
+    return NextResponse.json({ success: true, mail });
   } catch (error) {
     console.error('Admin PATCH error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

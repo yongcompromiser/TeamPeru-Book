@@ -49,6 +49,7 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [copiedUserId, setCopiedUserId] = useState('');
+  const [mailNotice, setMailNotice] = useState('');
 
   // 승인해도 본인에게 알림이 가지 않는다. 승인 뒤 카톡으로 보낼 안내문을 통째로 복사해준다.
   const copyApprovalGuide = async (user: ProfileWithRole) => {
@@ -100,11 +101,23 @@ export default function AdminPage() {
   };
 
   const handleApprove = async (userId: string) => {
-    await fetch('/api/admin', {
+    setMailNotice('');
+    const res = await fetch('/api/admin', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, role: 'member' }),
     });
+    const data = await res.json().catch(() => ({}));
+
+    // 승인 안내 메일 결과를 알려준다. 실패해도 승인은 이미 끝났으니,
+    // 그때는 '안내문' 버튼으로 직접 보내면 된다.
+    if (data?.mail) {
+      setMailNotice(
+        data.mail.sent
+          ? '승인 완료 · 안내 메일을 보냈습니다.'
+          : `승인은 완료됐지만 메일 발송은 실패했습니다: ${data.mail.reason ?? '알 수 없음'}`
+      );
+    }
     await fetchData();
   };
 
@@ -153,6 +166,15 @@ export default function AdminPage() {
       {loadError && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {loadError}
+        </div>
+      )}
+
+      {mailNotice && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <span>{mailNotice}</span>
+          <button onClick={() => setMailNotice('')} className="text-blue-400 hover:text-blue-700">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
