@@ -572,25 +572,17 @@ export default function SchedulePage() {
         await fetchAllData();
         return;
       }
-    } catch (e) {
-      console.log('API failed, trying direct');
-    }
 
-    // Fallback
-    const { error } = await supabase
-      .from('schedules')
-      .update({ selected_book_id: bookId })
-      .eq('id', selectedSchedule.id);
-
-    if (!error) {
-      await supabase
-        .from('books')
-        .update({ status: 'selected' })
-        .eq('id', bookId);
-
-      alert('책이 선정되었습니다!');
-      await fetchSchedules();
-      await fetchAvailableBooks();
+      // 서버가 거절하면 직접 쓰기로 넘어가지 않는다.
+      // schedules 의 RLS 는 UPDATE 를 관리자에게만 허용해서, 발제자(member)가 직접 쓰면
+      // 0행이 수정되는데 에러가 나지 않는다. 그래서 '선정되었습니다'만 뜨고 실제로는
+      // 아무것도 안 바뀌는 상태가 됐다.
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || '책 선정에 실패했습니다.');
+      await fetchAllData();
+    } catch {
+      alert('책 선정 요청을 보내지 못했습니다. 새로고침 후 다시 시도해주세요.');
+      await fetchAllData();
     }
   };
 

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { getViewer, isMember } from '@/lib/permissions';
 
@@ -84,8 +85,31 @@ export async function POST(request: Request) {
     }
 
     if (action === 'select_book') {
-      // Select final book for schedule
-      const { error: scheduleError } = await supabase
+      const admin = createAdminClient();
+
+      // schedules 의 RLS 는 UPDATE 를 관리자에게만 허용한다. 사용자 클라이언트로 고치면
+      // 발제자(member)일 때 0행이 수정되는데 에러도 나지 않아 조용히 실패한다.
+      // 그래서 admin 으로 쓰되, 권한은 여기서 직접 확인한다.
+      const { data: schedule } = await admin
+        .from('schedules')
+        .select('presenter_id')
+        .eq('id', scheduleId)
+        .maybeSingle();
+
+      if (!schedule) {
+        return NextResponse.json({ error: '모임을 찾을 수 없습니다.' }, { status: 404 });
+      }
+
+      // 관리자 또는 그 모임의 발제자만 선정할 수 있다 (화면 조건과 동일)
+      const canSelect = viewer?.role === 'admin' || schedule.presenter_id === user.id;
+      if (!canSelect) {
+        return NextResponse.json(
+          { error: '관리자 또는 발제자만 책을 선정할 수 있습니다.' },
+          { status: 403 }
+        );
+      }
+
+      const { error: scheduleError } = await admin
         .from('schedules')
         .update({ selected_book_id: bookId })
         .eq('id', scheduleId);
@@ -94,11 +118,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: scheduleError.message }, { status: 400 });
       }
 
-      // Update book status
-      await supabase
-        .from('books')
-        .update({ status: 'selected' })
-        .eq('id', bookId);
+      // 책 상태도 admin 으로. books 역시 RLS 에 걸려 조용히 실패할 수 있다.
+      await admin.from('books').update({ status: 'selected' }).eq('id', bookId);
 
       return NextResponse.json({ success: true });
     }
