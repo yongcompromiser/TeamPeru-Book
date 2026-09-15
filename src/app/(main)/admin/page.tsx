@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +34,6 @@ const roleBadgeVariant: Record<RoleType, 'info' | 'success' | 'warning' | 'defau
 
 export default function AdminPage() {
   const { profile } = useAuth();
-  const supabase = createClient();
   const [users, setUsers] = useState<ProfileWithRole[]>([]);
   const [pendingUsers, setPendingUsers] = useState<ProfileWithRole[]>([]);
   const [guestUsers, setGuestUsers] = useState<ProfileWithRole[]>([]);
@@ -49,6 +47,7 @@ export default function AdminPage() {
   });
   const [selectedUser, setSelectedUser] = useState<ProfileWithRole | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const isAdmin = profile?.role === 'admin';
 
@@ -58,59 +57,27 @@ export default function AdminPage() {
     }
   }, [isAdmin]);
 
+  // /api/admin 은 service role 로 읽으므로 pending/guest 까지 전부 내려온다.
+  // 예전에는 실패하면 조용히 브라우저에서 직접 Supabase 를 조회했는데, 그쪽은 RLS 가 걸려
+  // pending/guest 가 통째로 빠진 목록이 "정상"처럼 보였다. 그래서 폴백을 없애고 실패를 드러낸다.
   const fetchData = async () => {
-    // 먼저 API를 통해 시도
+    setLoadError('');
     try {
       const res = await fetch('/api/admin');
-      if (res.ok) {
-        const data = await res.json();
-        const allUsers = (data.users as ProfileWithRole[]) || [];
-        setUsers(allUsers.filter(u => u.role !== 'pending' && u.role !== 'guest'));
-        setPendingUsers(allUsers.filter(u => u.role === 'pending'));
-        setGuestUsers(allUsers.filter(u => u.role === 'guest'));
-        setStats(data.stats);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoadError(data.error || `회원 목록을 불러오지 못했습니다. (${res.status})`);
         return;
       }
+      const allUsers = (data.users as ProfileWithRole[]) || [];
+      setUsers(allUsers.filter(u => u.role !== 'pending' && u.role !== 'guest'));
+      setPendingUsers(allUsers.filter(u => u.role === 'pending'));
+      setGuestUsers(allUsers.filter(u => u.role === 'guest'));
+      setStats(data.stats);
     } catch (e) {
-      console.log('API fetch failed, trying direct:', e);
+      console.error('Admin fetch failed:', e);
+      setLoadError('회원 목록을 불러오지 못했습니다. 네트워크를 확인해주세요.');
     }
-
-    // API 실패시 직접 Supabase 호출
-    const { data: usersData } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    const allUsers = (usersData as ProfileWithRole[]) || [];
-    setUsers(allUsers.filter(u => u.role !== 'pending' && u.role !== 'guest'));
-    setPendingUsers(allUsers.filter(u => u.role === 'pending'));
-    setGuestUsers(allUsers.filter(u => u.role === 'guest'));
-
-    // Fetch stats
-    const [
-      { count: userCount },
-      { count: bookCount },
-      { count: scheduleCount },
-      { count: discussionCount },
-      { count: reviewCount },
-      { count: recapCount },
-    ] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'pending'),
-      supabase.from('books').select('*', { count: 'exact', head: true }),
-      supabase.from('schedules').select('*', { count: 'exact', head: true }),
-      supabase.from('discussions').select('*', { count: 'exact', head: true }),
-      supabase.from('reviews').select('*', { count: 'exact', head: true }),
-      supabase.from('recaps').select('*', { count: 'exact', head: true }),
-    ]);
-
-    setStats({
-      users: userCount || 0,
-      books: bookCount || 0,
-      schedules: scheduleCount || 0,
-      discussions: discussionCount || 0,
-      reviews: reviewCount || 0,
-      recaps: recapCount || 0,
-    });
   };
 
   const handleApprove = async (userId: string) => {
@@ -163,6 +130,12 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">관리자</h1>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

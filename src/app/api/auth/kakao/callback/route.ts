@@ -126,7 +126,13 @@ export async function GET(request: NextRequest) {
         // 게스트 참여로 처음 들어온 신규 사용자는 승인 없이 guest 역할 부여.
         // 단, 이미 member/admin 인 사용자는 절대 강등하지 않는다(pending 일 때만 승격).
         if (mode === 'guest' && target.role === 'pending') {
-          await admin.from('profiles').update({ role: 'guest' }).eq('id', target.id);
+          // 실패해도 입장은 막지 않되, 조용히 넘어가면 원인을 못 찾으므로 남긴다.
+          // (예: profiles_role_check 에 'guest' 가 없으면 여기서 막힌다)
+          const { error: roleErr } = await admin
+            .from('profiles')
+            .update({ role: 'guest' })
+            .eq('id', target.id);
+          if (roleErr) console.error('게스트 역할 부여 실패:', roleErr.message);
         }
 
         // 초대장(/invite/[id])을 통해 들어온 경우 그 모임의 참석 명단에 자동 등록.

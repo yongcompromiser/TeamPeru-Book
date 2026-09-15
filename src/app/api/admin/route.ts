@@ -72,9 +72,15 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
+// 관리자 페이지 데이터.
+//
+// 조회는 반드시 adminClient(service role)로 한다. 사용자 클라이언트로 profiles 를 읽으면
+// RLS 정책에 따라 pending/guest 행이 조용히 빠져서, 가입 신청이 들어와도
+// "승인 대기 0명 / 멤버 그대로"로만 보인다. (에러가 아니라 빈 결과로 오기 때문에 티가 안 난다)
 export async function GET() {
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -82,7 +88,7 @@ export async function GET() {
     }
 
     // Check if admin
-    const { data: profile } = await supabase
+    const { data: profile } = await adminClient
       .from('profiles')
       .select('role')
       .eq('id', user.id)
@@ -93,10 +99,15 @@ export async function GET() {
     }
 
     // Fetch all users
-    const { data: usersData } = await supabase
+    const { data: usersData, error: usersErr } = await adminClient
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false });
+
+    if (usersErr) {
+      console.error('Admin 회원 목록 조회 실패:', usersErr.message);
+      return NextResponse.json({ error: usersErr.message }, { status: 500 });
+    }
 
     // Fetch stats
     const [
@@ -107,12 +118,12 @@ export async function GET() {
       { count: reviewCount },
       { count: recapCount },
     ] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'pending'),
-      supabase.from('books').select('*', { count: 'exact', head: true }),
-      supabase.from('schedules').select('*', { count: 'exact', head: true }),
-      supabase.from('discussions').select('*', { count: 'exact', head: true }),
-      supabase.from('reviews').select('*', { count: 'exact', head: true }),
-      supabase.from('recaps').select('*', { count: 'exact', head: true }),
+      adminClient.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'pending'),
+      adminClient.from('books').select('*', { count: 'exact', head: true }),
+      adminClient.from('schedules').select('*', { count: 'exact', head: true }),
+      adminClient.from('discussions').select('*', { count: 'exact', head: true }),
+      adminClient.from('reviews').select('*', { count: 'exact', head: true }),
+      adminClient.from('recaps').select('*', { count: 'exact', head: true }),
     ]);
 
     return NextResponse.json({
