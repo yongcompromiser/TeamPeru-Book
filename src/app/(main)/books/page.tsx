@@ -10,6 +10,7 @@ import { Plus, BookOpen, Settings, Tag, Sparkles } from 'lucide-react';
 import { BookStatus, BOOK_STATUS_LABELS, BOOK_STATUS_COLORS } from '@/types';
 import { BOOK_CATEGORIES } from '@/lib/book-category';
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/avatar';
 
 interface Book {
   id: string;
@@ -21,6 +22,8 @@ interface Book {
   created_at?: string;
   was_nominated?: boolean; // 후보에 한 번이라도 오른 적 있음(파생)
   discussed_at?: string | null; // 토론한 모임 날짜(파생), 없으면 null
+  created_by_profile?: { name: string; avatar_url?: string | null } | null; // 등록자
+  presenter?: { name: string; avatar_url?: string | null } | null; // 토론 시 발제자(파생)
 }
 
 const STATUS_FILTERS: { value: BookStatus | 'all'; label: string }[] = [
@@ -434,6 +437,20 @@ export default function BooksPage() {
 
                     <h3 className="font-semibold text-gray-900 truncate">{book.title}</h3>
                     <p className="text-sm text-gray-600 truncate">{book.author}</p>
+                    {/* 토론 완료 책은 발제자, 그 외에는 등록자 표시 */}
+                    {(() => {
+                      const showPresenter = book.status === 'completed' && book.presenter;
+                      const who = showPresenter ? book.presenter : book.created_by_profile;
+                      if (!who?.name) return null;
+                      return (
+                        <p className="mt-1.5 flex items-center gap-1 text-xs text-gray-500 truncate">
+                          <Avatar src={who.avatar_url} name={who.name} size="xs" />
+                          <span className="truncate">
+                            {showPresenter ? '발제' : '추가'} · {who.name}
+                          </span>
+                        </p>
+                      );
+                    })()}
                     {book.created_at && (
                       <p className="text-xs text-gray-400 mt-1">
                         {new Date(book.created_at).toLocaleDateString('ko-KR')}
