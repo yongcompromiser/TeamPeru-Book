@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Calendar, MapPin, User, Book, Users, Check, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, User, Book, Users, Check, Loader2, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Meeting {
@@ -351,9 +351,28 @@ export default function InvitePage({ params }: PageProps) {
                 카카오로 게스트 참여하기
               </a>
 
-              <ul className="text-xs text-stone-400 mt-4 space-y-1.5 text-left">
+              <p className="text-[11px] text-stone-500 mt-2">
+                닉네임만 받아요 · 승인 없이 바로 입장
+              </p>
+
+              {/* 그냥 가입 — 카카오와 같은 비중으로 둔다 */}
+              {!emailOpen && !emailDone && (
+                <>
+                  <button
+                    onClick={() => setEmailOpen(true)}
+                    className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 text-base font-semibold text-amber-100 transition-colors hover:bg-amber-500/20"
+                  >
+                    <Mail className="w-5 h-5" />
+                    그냥 가입하기
+                  </button>
+                  <p className="text-[11px] text-stone-500 mt-2">
+                    이메일로 가입 · 관리자 승인 후 입장
+                  </p>
+                </>
+              )}
+
+              <ul className="text-xs text-stone-400 mt-5 space-y-1.5 text-left">
                 {[
-                  '승인을 기다릴 필요 없이 바로 입장돼요',
                   '참석 명단에 자동으로 올라가요',
                   '책·회의록을 둘러보고 한줄평과 평점을 남길 수 있어요',
                 ].map((t) => (
@@ -364,12 +383,8 @@ export default function InvitePage({ params }: PageProps) {
                 ))}
               </ul>
 
-              <p className="text-[11px] text-stone-500 mt-4">
-                카카오 닉네임만 받아요. 이메일이나 전화번호는 받지 않습니다.
-              </p>
-
-              {/* 이메일 가입 (승인 대기) */}
-              <div className="mt-6 pt-5 border-t border-amber-500/10">
+              {/* 가입 폼 / 완료 */}
+              <div className={cn((emailOpen || emailDone) && 'mt-6 pt-5 border-t border-amber-500/10')}>
                 {emailDone ? (
                   <div className="text-center">
                     <div className="w-11 h-11 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-2">
@@ -380,17 +395,10 @@ export default function InvitePage({ params }: PageProps) {
                       관리자가 확인한 뒤 입장할 수 있어요. 승인되면 로그인해주세요.
                     </p>
                   </div>
-                ) : !emailOpen ? (
-                  <button
-                    onClick={() => setEmailOpen(true)}
-                    className="w-full text-sm text-stone-400 hover:text-stone-200 transition-colors"
-                  >
-                    카카오가 없으신가요? <span className="underline">이메일로 가입하기</span>
-                  </button>
-                ) : (
+                ) : !emailOpen ? null : (
                   <div className="space-y-2.5 text-left">
                     <p className="text-xs text-stone-400">
-                      이메일 가입은 <b className="text-stone-300">관리자 승인</b> 후 이용할 수 있어요.
+                      가입하면 <b className="text-stone-300">관리자 승인</b> 후 입장할 수 있어요.
                     </p>
                     {[
                       { v: emailName, set: setEmailName, ph: '이름', type: 'text', max: 40 },
@@ -412,9 +420,9 @@ export default function InvitePage({ params }: PageProps) {
                       <button
                         onClick={handleEmailSignup}
                         disabled={emailSubmitting}
-                        className="flex-1 h-10 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-500 disabled:opacity-60 flex items-center justify-center"
+                        className="flex-1 h-12 rounded-lg bg-amber-600 text-white text-base font-semibold hover:bg-amber-500 disabled:opacity-60 flex items-center justify-center"
                       >
-                        {emailSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : '가입 신청'}
+                        {emailSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : '가입 신청'}
                       </button>
                       <button
                         onClick={() => {
@@ -422,7 +430,7 @@ export default function InvitePage({ params }: PageProps) {
                           setEmailError('');
                         }}
                         disabled={emailSubmitting}
-                        className="px-4 h-10 rounded-lg border border-stone-600 text-sm text-stone-300 hover:bg-white/5"
+                        className="px-4 h-12 rounded-lg border border-stone-600 text-sm text-stone-300 hover:bg-white/5"
                       >
                         취소
                       </button>
