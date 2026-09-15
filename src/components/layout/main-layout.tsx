@@ -68,7 +68,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+        {/* min-w-0: 내부에 넓은 콘텐츠(마퀴 등)가 있어도 flex 아이템이 줄어들어
+            가로 스크롤/사이드바 눌림이 생기지 않게 한다 */}
+        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );
