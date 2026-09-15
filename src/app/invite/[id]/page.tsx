@@ -52,10 +52,13 @@ export default function InvitePage({ params }: PageProps) {
   const [password, setPassword] = useState('');
   const [emailSubmitting, setEmailSubmitting] = useState(false);
   const [emailError, setEmailError] = useState('');
+  // 서버가 알려준 실제 실패 사유. 뭉뚱그린 문구만 보면 원인을 못 찾는다.
+  const [emailErrorDetail, setEmailErrorDetail] = useState('');
   const [emailDone, setEmailDone] = useState(false);
 
   const handleEmailSignup = async () => {
     setEmailError('');
+    setEmailErrorDetail('');
     setEmailSubmitting(true);
     try {
       const res = await fetch(`/api/invite/${id}/signup`, {
@@ -68,6 +71,7 @@ export default function InvitePage({ params }: PageProps) {
         setEmailDone(true);
       } else {
         setEmailError(data.error || '가입에 실패했어요. 다시 시도해주세요.');
+        setEmailErrorDetail(data.detail || '');
       }
     } catch {
       setEmailError('가입 중 오류가 발생했습니다.');
@@ -415,7 +419,16 @@ export default function InvitePage({ params }: PageProps) {
                         className="w-full rounded-lg bg-black/25 border border-amber-500/20 px-3 py-2 text-sm text-amber-50 placeholder:text-stone-500 focus:outline-none focus:ring-1 focus:ring-amber-500/60"
                       />
                     ))}
-                    {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+                    {emailError && (
+                      <div>
+                        <p className="text-xs text-red-400">{emailError}</p>
+                        {emailErrorDetail && (
+                          <p className="text-[11px] text-stone-500 mt-1 break-words">
+                            사유: {emailErrorDetail}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <button
                         onClick={handleEmailSignup}
