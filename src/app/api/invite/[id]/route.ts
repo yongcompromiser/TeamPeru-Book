@@ -16,7 +16,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { data: schedule } = await admin
     .from('schedules')
-    .select('id, title, meeting_date, meeting_time, location, invite_public, presenter_id, selected_book_id')
+    .select(
+      'id, title, meeting_date, meeting_time, location, invite_public, presenter_id, selected_book_id, description'
+    )
     .eq('id', id)
     .maybeSingle();
 
@@ -36,13 +38,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   let book: { title: string; author: string; cover_url: string | null } | null = null;
+  // 책 자체의 등록 사유도 예비로 받아둔다(발제자가 따로 안 적었을 때 쓴다)
+  let bookReason: string | null = null;
   if (schedule.selected_book_id) {
     const { data: b } = await admin
       .from('books')
-      .select('title, author, cover_url')
+      .select('title, author, cover_url, selection_reason')
       .eq('id', schedule.selected_book_id)
       .maybeSingle();
-    book = b ?? null;
+    if (b) {
+      book = { title: b.title, author: b.author, cover_url: b.cover_url ?? null };
+      bookReason = (b.selection_reason as string | null) ?? null;
+    }
   }
 
   // 이미 신청한 인원 수 (이름/연락처 등 개인정보는 공개 API에서 노출하지 않음)
@@ -61,6 +68,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       location: schedule.location ?? null,
       presenter_name: presenterName,
       book,
+      // 발제자가 적은 선정 사유를 우선하고, 없으면 책 등록 때의 사유를 쓴다
+      selection_reason:
+        ((schedule.description as string | null) ?? '').trim() || bookReason || null,
       rsvp_count: count ?? 0,
     },
   });

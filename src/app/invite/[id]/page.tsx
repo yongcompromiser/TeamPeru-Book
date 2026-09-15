@@ -13,6 +13,7 @@ interface Meeting {
   location: string | null;
   presenter_name: string | null;
   book: { title: string; author: string; cover_url: string | null } | null;
+  selection_reason: string | null;
   rsvp_count: number;
 }
 
@@ -151,6 +152,18 @@ export default function InvitePage({ params }: PageProps) {
               현재 {meeting.rsvp_count}명 참석 신청
             </p>
           </div>
+
+          {/* 발제자가 이 책을 고른 이유 — 초대장에서 가장 끌리는 대목이라 그대로 보여준다 */}
+          {meeting.selection_reason && (
+            <div className="border-t border-gray-100 px-5 py-4 bg-amber-50/40">
+              <p className="text-xs font-semibold text-amber-700 mb-1.5">
+                {meeting.presenter_name ? `${meeting.presenter_name}님이 이 책을 고른 이유` : '이 책을 고른 이유'}
+              </p>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {meeting.selection_reason}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* 참여는 카카오로만 받는다.

@@ -1078,8 +1078,11 @@ export default function MeetingDetailPage({ params }: PageProps) {
         />
       )}
 
-      {/* 게스트 공개 초대 (관리자 전용) */}
-      {isAdmin && (
+      {/* 게스트 초대.
+          켜고 끄는 건 관리자만, 링크 복사는 멤버도 할 수 있게 한다.
+          (관리자가 켜두면 멤버들이 각자 지인을 초대할 수 있어야 한다)
+          비공개 상태에서는 관리자에게만 보인다 — 멤버에게 꺼진 토글을 보여줄 이유가 없다. */}
+      {(isAdmin || schedule.invite_public) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -1088,29 +1091,38 @@ export default function MeetingDetailPage({ params }: PageProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between gap-3">
+            {isAdmin ? (
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">공개 초대 링크</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    켜면 로그인 없이 누구나 이 모임을 보고 참석 신청할 수 있어요.
+                  </p>
+                </div>
+                <button
+                  onClick={handleToggleInvite}
+                  disabled={isTogglingInvite}
+                  className={cn(
+                    'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-60',
+                    schedule.invite_public ? 'bg-amber-600' : 'bg-gray-300'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                      schedule.invite_public ? 'translate-x-5' : 'translate-x-0.5'
+                    )}
+                  />
+                </button>
+              </div>
+            ) : (
               <div>
                 <p className="text-sm font-medium text-gray-800">공개 초대 링크</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  켜면 로그인 없이 누구나 이 모임을 보고 참석 신청할 수 있어요.
+                  링크를 복사해 함께하고 싶은 분에게 보내보세요.
                 </p>
               </div>
-              <button
-                onClick={handleToggleInvite}
-                disabled={isTogglingInvite}
-                className={cn(
-                  'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-60',
-                  schedule.invite_public ? 'bg-amber-600' : 'bg-gray-300'
-                )}
-              >
-                <span
-                  className={cn(
-                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
-                    schedule.invite_public ? 'translate-x-5' : 'translate-x-0.5'
-                  )}
-                />
-              </button>
-            </div>
+            )}
 
             {schedule.invite_public && (
               <div className="mt-3 flex items-center gap-2">
@@ -1127,7 +1139,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
               </div>
             )}
 
-            {/* 참석 신청(RSVP) 목록 */}
+            {/* 참석 신청(RSVP) 목록 — 이름·연락처가 들어 있어 관리자에게만 보인다.
+                서버에서도 관리자에게만 내려준다(/api/meetings/[id]). */}
+            {isAdmin && (
             <div className="mt-4 border-t border-gray-100 pt-3">
               <p className="text-sm font-medium text-gray-800 mb-2 inline-flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-amber-600" />
@@ -1169,6 +1183,7 @@ export default function MeetingDetailPage({ params }: PageProps) {
                 <p className="text-sm text-gray-400">아직 참석 신청이 없어요.</p>
               )}
             </div>
+            )}
           </CardContent>
         </Card>
       )}
