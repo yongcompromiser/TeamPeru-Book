@@ -57,7 +57,8 @@ export function MainLayout({ children }: MainLayoutProps) {
       <Header onMenuClick={() => setSidebarOpen(true)} />
       {isGuest && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800">
-          👋 <b>게스트 모드</b>로 둘러보는 중이에요. 정회원이 되면 발제·투표 등 모든 기능을 쓸 수 있어요.
+          👋 <b>게스트 모드</b>예요. 초대받은 모임에 발제·한줄평·평점을 남길 수 있어요.
+          일정·책 투표와 책 등록은 정회원부터예요.
           <a href="/profile" className="ml-2 font-semibold underline hover:text-amber-900">정회원 신청</a>
         </div>
       )}

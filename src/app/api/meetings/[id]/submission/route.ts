@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getViewer, canSubmitToMeeting } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 
 export async function POST(
@@ -12,6 +13,16 @@ export async function POST(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 게스트는 초대받은 모임에만 제출할 수 있다(참석 명단에 있는지로 판정).
+    // 정회원·관리자는 모든 모임에 제출할 수 있다.
+    const viewer = await getViewer();
+    if (!(await canSubmitToMeeting(viewer, scheduleId))) {
+      return NextResponse.json(
+        { error: '초대받은 모임에만 작성할 수 있습니다.' },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

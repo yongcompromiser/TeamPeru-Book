@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getViewer, isMember } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 
@@ -86,6 +87,17 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { action, ...data } = body;
+
+    // 일정·책 투표는 모임 운영에 영향을 주므로 정회원만 한다 (게스트 제외)
+    if (action === 'vote' || action === 'unvote') {
+      const viewer = await getViewer();
+      if (!isMember(viewer)) {
+        return NextResponse.json(
+          { error: '정회원만 일정 투표를 할 수 있습니다.' },
+          { status: 403 }
+        );
+      }
+    }
 
     if (action === 'vote') {
       // 투표 추가

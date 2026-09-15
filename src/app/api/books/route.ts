@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getViewer, isMember } from '@/lib/permissions';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
@@ -25,6 +26,15 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 책 목록은 모임이 함께 쓰는 것이라 게스트는 등록하지 않는다
+    const viewer = await getViewer();
+    if (!isMember(viewer)) {
+      return NextResponse.json(
+        { error: '정회원만 책을 등록할 수 있습니다.' },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -133,6 +143,11 @@ export async function DELETE(request: Request) {
       .select('role')
       .eq('id', user.id)
       .single();
+
+    // 게스트는 이전에 등록해둔 책이 있더라도 지우지 못한다
+    if (profile?.role !== 'member' && profile?.role !== 'admin') {
+      return NextResponse.json({ error: '삭제 권한이 없습니다' }, { status: 403 });
+    }
 
     if (book.created_by !== user.id && profile?.role !== 'admin') {
       return NextResponse.json({ error: '삭제 권한이 없습니다' }, { status: 403 });

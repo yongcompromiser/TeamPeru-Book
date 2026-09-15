@@ -27,6 +27,37 @@ export default function InvitePage({ params }: PageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
+  // 이메일 가입 (카카오 대안)
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailName, setEmailName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailSubmitting, setEmailSubmitting] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [emailDone, setEmailDone] = useState(false);
+
+  const handleEmailSignup = async () => {
+    setEmailError('');
+    setEmailSubmitting(true);
+    try {
+      const res = await fetch(`/api/invite/${id}/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: emailName, email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setEmailDone(true);
+      } else {
+        setEmailError(data.error || '가입에 실패했어요. 다시 시도해주세요.');
+      }
+    } catch {
+      setEmailError('가입 중 오류가 발생했습니다.');
+    } finally {
+      setEmailSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -158,6 +189,80 @@ export default function InvitePage({ params }: PageProps) {
           <p className="text-[11px] text-gray-400 mt-4">
             카카오 닉네임만 받아요. 이메일이나 전화번호는 받지 않습니다.
           </p>
+
+          {/* 이메일 가입 — 카카오가 없거나 쓰기 싫은 분을 위한 대안.
+              이쪽은 아무 주소나 넣을 수 있어 바로 입장시키지 않고 승인 대기로 둔다. */}
+          <div className="mt-6 pt-5 border-t border-gray-100">
+            {emailDone ? (
+              <div className="text-center">
+                <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-2">
+                  <Check className="w-5 h-5 text-green-600" />
+                </div>
+                <p className="font-bold text-gray-900 text-sm">가입 신청 완료!</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  관리자가 확인한 뒤 입장할 수 있어요. 승인되면 로그인해주세요.
+                </p>
+              </div>
+            ) : !emailOpen ? (
+              <button
+                onClick={() => setEmailOpen(true)}
+                className="w-full text-sm text-gray-500 hover:text-gray-800 transition-colors"
+              >
+                카카오가 없으신가요? <span className="underline">이메일로 가입하기</span>
+              </button>
+            ) : (
+              <div className="space-y-2.5 text-left">
+                <p className="text-xs text-gray-500">
+                  이메일 가입은 <b>관리자 승인</b> 후 이용할 수 있어요.
+                </p>
+                <input
+                  value={emailName}
+                  onChange={(e) => setEmailName(e.target.value)}
+                  placeholder="이름"
+                  maxLength={40}
+                  className="w-full border rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="이메일"
+                  className="w-full border rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="비밀번호 (6자 이상)"
+                  className="w-full border rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+                {emailError && <p className="text-xs text-red-600">{emailError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleEmailSignup}
+                    disabled={emailSubmitting}
+                    className="flex-1 h-10 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-gray-900 disabled:opacity-60 flex items-center justify-center"
+                  >
+                    {emailSubmitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      '가입 신청'
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEmailOpen(false);
+                      setEmailError('');
+                    }}
+                    disabled={emailSubmitting}
+                    className="px-4 h-10 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">

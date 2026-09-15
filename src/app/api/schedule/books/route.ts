@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { getViewer, isMember } from '@/lib/permissions';
 
 export async function POST(request: Request) {
   try {
@@ -12,6 +13,15 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { action, scheduleId, bookId, candidateId } = body;
+
+    // 후보 등록·투표·선정은 모두 모임 운영에 영향을 준다. 정회원만.
+    const viewer = await getViewer();
+    if (!isMember(viewer)) {
+      return NextResponse.json(
+        { error: '정회원만 책 후보·투표를 다룰 수 있습니다.' },
+        { status: 403 }
+      );
+    }
 
     if (action === 'add_candidate') {
       // Add book to candidates
