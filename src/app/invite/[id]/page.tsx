@@ -416,7 +416,9 @@ export default function InvitePage({ params }: PageProps) {
                         onChange={(e) => f.set(e.target.value)}
                         placeholder={f.ph}
                         maxLength={f.max}
-                        className="w-full rounded-lg bg-black/25 border border-amber-500/20 px-3 py-2 text-sm text-amber-50 placeholder:text-stone-500 focus:outline-none focus:ring-1 focus:ring-amber-500/60"
+                        // 어두운 배경에 어두운 입력칸을 두니 입력한 글자가 안 보였다.
+                        // 책 속지처럼 밝은 칸에 검은 글씨로 둔다.
+                        className="w-full rounded-lg bg-[#f7efdd] border border-amber-700/30 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/70"
                       />
                     ))}
                     {emailError && (
