@@ -570,6 +570,12 @@ export default function SchedulePage() {
       if (res.ok) {
         alert('책이 선정되었습니다!');
         await fetchAllData();
+        // fetchAllData 는 schedules 배열만 새로 받고 selectedSchedule 은 그대로 둔다.
+        // 화면의 상세 패널은 selectedSchedule 을 보므로, 여기서 같이 갱신하지 않으면
+        // 저장은 됐는데 화면은 '미선정' 그대로여서 반영이 안 된 것처럼 보인다.
+        // (시간·장소 저장에서는 이미 같은 처리를 하고 있다)
+        setSelectedSchedule({ ...selectedSchedule, selected_book_id: bookId });
+        await fetchBookCandidates(selectedSchedule.id);
         return;
       }
 
