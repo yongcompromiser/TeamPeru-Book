@@ -8,11 +8,34 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const supabase = await createClient();
     const adminClient = createAdminClient();
+
+    // adminClient 는 RLS 를 우회하므로 여기서 직접 막지 않으면 로그인 없이도 읽힌다.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: me } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isAdmin = me?.role === 'admin';
+
+    // raw_text 는 녹취 원문이라 대화가 그대로 들어 있다. 정리본(summary)만 공유하고
+    // 원문은 회의록 정리 작업을 하는 관리자에게만 내려준다.
+    // (화면에서도 STT 원문 카드는 관리자에게만 보인다)
+    const columns = isAdmin
+      ? 'id, schedule_id, raw_text, summary, created_by, created_at, updated_at'
+      : 'id, schedule_id, summary, created_by, created_at, updated_at';
 
     const { data } = await adminClient
       .from('meeting_minutes')
-      .select('*')
+      .select(columns)
       .eq('schedule_id', id)
       .single();
 
