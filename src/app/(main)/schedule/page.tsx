@@ -34,6 +34,7 @@ interface Schedule {
   presenter_id: string | null;
   selected_book_id: string | null;
   status: string;
+  is_revealed?: boolean;
   presenter?: { name: string };
   selected_book?: { title: string; author: string };
 }
@@ -553,8 +554,23 @@ export default function SchedulePage() {
     await fetchBookCandidates(selectedSchedule.id);
   };
 
-  const handleSelectFinalBook = async (bookId: string) => {
+  const handleSelectFinalBook = async (bookId: string, title?: string) => {
     if (!selectedSchedule) return;
+
+    // 이미 정해진 책을 다른 책으로 바꾸는 경우 — 남아 있는 내용이 있으니 먼저 알린다
+    const isChange = !!selectedSchedule.selected_book_id && selectedSchedule.selected_book_id !== bookId;
+    if (isChange) {
+      const lines = [
+        `선정 도서를 '${title ?? '이 책'}' 으로 바꿀까요?`,
+        '',
+        '이미 쓴 발제·한줄평·평점과 선정 사유는 지워지지 않습니다.',
+        '이전 책 기준으로 쓴 내용이 있다면 직접 고쳐주세요.',
+      ];
+      if (selectedSchedule.is_revealed) {
+        lines.push('', '※ 이미 공개된 모임입니다. 통계와 연말결산 집계도 함께 바뀝니다.');
+      }
+      if (!confirm(lines.join('\n'))) return;
+    }
 
     try {
       const res = await fetch('/api/schedule/books', {
@@ -568,7 +584,18 @@ export default function SchedulePage() {
       });
 
       if (res.ok) {
-        alert('책이 선정되었습니다!');
+        const result = await res.json().catch(() => ({}));
+        if (result.changed && (result.affectedSubmissions > 0 || result.hasSelectionReason)) {
+          const todo: string[] = [];
+          if (result.affectedSubmissions > 0)
+            todo.push(`이미 제출된 발제·한줄평 ${result.affectedSubmissions}건`);
+          if (result.hasSelectionReason) todo.push('발제자가 쓴 선정 사유');
+          alert(
+            `책을 바꿨습니다.\n\n${todo.join('\n')}\n\n위 내용은 이전 책 기준이라 그대로 남아 있습니다. 확인해주세요.`
+          );
+        } else {
+          alert(isChange ? '선정 도서를 변경했습니다.' : '책이 선정되었습니다!');
+        }
         await fetchAllData();
         // fetchAllData 는 schedules 배열만 새로 받고 selectedSchedule 은 그대로 둔다.
         // 화면의 상세 패널은 selectedSchedule 을 보므로, 여기서 같이 갱신하지 않으면
@@ -1020,14 +1047,20 @@ export default function SchedulePage() {
                                     {getBookVoteCount(candidate.book_id)}
                                   </span>
                                 </button>
-                                {canManageBooks && !selectedSchedule.selected_book_id && (
+                                {/* 선정된 책이 있어도 다른 후보로 바꿀 수 있다.
+                                    공개된 모임은 집계까지 바뀌므로 관리자만. (서버에서도 막는다) */}
+                                {canManageBooks &&
+                                  candidate.book_id !== selectedSchedule.selected_book_id &&
+                                  (!selectedSchedule.is_revealed || isAdmin) && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleSelectFinalBook(candidate.book_id)}
+                                    onClick={() =>
+                                      handleSelectFinalBook(candidate.book_id, candidate.book?.title)
+                                    }
                                     className="text-xs h-7"
                                   >
-                                    선정
+                                    {selectedSchedule.selected_book_id ? '이걸로 변경' : '선정'}
                                   </Button>
                                 )}
                               </div>
@@ -1057,8 +1090,10 @@ export default function SchedulePage() {
                   )}
                 </div>
 
-                {/* Add Book (Admin/Presenter only) */}
-                {canManageBooks && !selectedSchedule.selected_book_id && (
+                {/* Add Book (Admin/Presenter only)
+                    책이 정해진 뒤에도 후보를 더 올릴 수 있어야 한다.
+                    그래야 모임 직전에 다른 책으로 바꿀 수 있다. */}
+                {canManageBooks && (!selectedSchedule.is_revealed || isAdmin) && (
                   <div>
                     <h3 className="font-medium text-gray-900 mb-3">도서 추가</h3>
                     <div className="max-h-48 overflow-y-auto space-y-2">

@@ -42,6 +42,8 @@ export function BookSelection({
   canManage,
   canVote,
   currentUserId,
+  isRevealed = false,
+  isAdmin = false,
   onChanged,
 }: {
   scheduleId: string;
@@ -49,6 +51,9 @@ export function BookSelection({
   canManage: boolean;
   canVote: boolean;
   currentUserId?: string;
+  /** 공개(토론 완료)된 모임인지 — 공개 후 책 변경은 관리자만 */
+  isRevealed?: boolean;
+  isAdmin?: boolean;
   /** 선정이 바뀌면 상위에서 모임 정보를 다시 불러오도록 */
   onChanged: () => void | Promise<void>;
 }) {
@@ -91,7 +96,11 @@ export function BookSelection({
     }
   };
 
-  const call = async (body: Record<string, unknown>, key: string) => {
+  /** 성공하면 응답 본문을 돌려준다. 실패하면 null. */
+  const call = async (
+    body: Record<string, unknown>,
+    key: string
+  ): Promise<Record<string, unknown> | null> => {
     setBusy(key);
     try {
       const res = await fetch('/api/schedule/books', {
@@ -99,15 +108,15 @@ export function BookSelection({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scheduleId, ...body }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         alert(data.error || '처리에 실패했습니다.');
-        return false;
+        return null;
       }
-      return true;
+      return data;
     } catch {
       alert('처리에 실패했습니다.');
-      return false;
+      return null;
     } finally {
       setBusy(null);
     }
@@ -127,12 +136,41 @@ export function BookSelection({
     if (ok) await load();
   };
 
-  const select = async (bookId: string) => {
-    if (!confirm('이 책으로 선정할까요?')) return;
-    const ok = await call({ action: 'select_book', bookId }, `select-${bookId}`);
-    if (ok) {
-      await load();
-      await onChanged();
+  const select = async (bookId: string, title?: string) => {
+    const isChange = !!selectedBookId && selectedBookId !== bookId;
+
+    if (isChange) {
+      const lines = [
+        `선정 도서를 '${title ?? '이 책'}' 으로 바꿀까요?`,
+        '',
+        '이미 쓴 발제·한줄평·평점과 선정 사유는 지워지지 않습니다.',
+        '이전 책 기준으로 쓴 내용이 있다면 직접 고쳐주세요.',
+      ];
+      if (isRevealed) {
+        lines.push('', '※ 이미 공개된 모임입니다. 통계와 연말결산 집계도 함께 바뀝니다.');
+      }
+      if (!confirm(lines.join('\n'))) return;
+    } else if (!confirm('이 책으로 선정할까요?')) {
+      return;
+    }
+
+    const data = await call({ action: 'select_book', bookId }, `select-${bookId}`);
+    if (!data) return;
+
+    await load();
+    await onChanged();
+
+    // 바꾼 뒤 손봐야 할 게 남아 있으면 짚어준다
+    if (data.changed) {
+      const todo: string[] = [];
+      const submitted = Number(data.affectedSubmissions ?? 0);
+      if (submitted > 0) todo.push(`이미 제출된 발제·한줄평 ${submitted}건`);
+      if (data.hasSelectionReason) todo.push('발제자가 쓴 선정 사유');
+      if (todo.length > 0) {
+        alert(
+          `책을 바꿨습니다.\n\n${todo.join('\n')}\n\n위 내용은 이전 책 기준이라 그대로 남아 있습니다. 확인해주세요.`
+        );
+      }
     }
   };
 
@@ -148,6 +186,9 @@ export function BookSelection({
     const ok = await call({ action: 'remove_candidate', candidateId }, `rm-${candidateId}`);
     if (ok) await load();
   };
+
+  // 공개된 모임의 책 변경은 집계까지 건드리므로 관리자만 할 수 있다 (서버에서도 막는다)
+  const canChangeSelected = canManage && (!isRevealed || isAdmin);
 
   // 선정도 끝났고 후보도 없으면 굳이 자리를 차지하지 않는다
   if (!isLoading && candidates.length === 0 && selectedBookId && !canManage) return null;
@@ -198,6 +239,15 @@ export function BookSelection({
           </div>
         ) : (
           <>
+            {/* 책이 정해진 뒤에도 바꿀 수 있다는 걸 알려준다 */}
+            {selectedBookId && canManage && (
+              <p className="text-xs text-gray-500">
+                {canChangeSelected
+                  ? '다른 후보의 [이걸로 변경] 을 누르면 선정 도서를 바꿀 수 있어요. 이미 쓴 발제·한줄평은 지워지지 않습니다.'
+                  : '이미 공개된 모임이라 책을 바꾸려면 관리자에게 요청해주세요.'}
+              </p>
+            )}
+
             {/* 후보 추가 */}
             {showAdd && (
               <div className="rounded-lg border border-dashed border-gray-300 p-3">
@@ -295,16 +345,24 @@ export function BookSelection({
                           {!canVote && (
                             <span className="text-xs text-gray-400 px-2">{count}표</span>
                           )}
-                          {canManage && !selectedBookId && (
+                          {/* 선정된 책이 있어도 다른 후보로 바꿀 수 있다.
+                              모임 직전에 책이 바뀌는 일이 실제로 생긴다. */}
+                          {canChangeSelected && !isSelected && (
                             <Button
                               size="sm"
                               variant="outline"
                               className="h-7 text-xs"
                               disabled={busy === `select-${c.book_id}`}
-                              onClick={() => select(c.book_id)}
+                              onClick={() => select(c.book_id, c.book?.title)}
                             >
-                              <Check className="w-3.5 h-3.5 mr-1" />
-                              선정
+                              {busy === `select-${c.book_id}` ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <>
+                                  <Check className="w-3.5 h-3.5 mr-1" />
+                                  {selectedBookId ? '이걸로 변경' : '선정'}
+                                </>
+                              )}
                             </Button>
                           )}
                         </div>

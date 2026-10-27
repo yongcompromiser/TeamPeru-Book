@@ -1085,6 +1085,8 @@ export default function MeetingDetailPage({ params }: PageProps) {
           canManage={canReveal}
           canVote={profile?.role === 'member' || profile?.role === 'admin'}
           currentUserId={user?.id}
+          isRevealed={schedule.is_revealed}
+          isAdmin={isAdmin}
           onChanged={fetchMeetingData}
         />
       )}
