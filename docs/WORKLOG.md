@@ -23,7 +23,15 @@ npm install
 ```
 
 - **`.env.local` 은 git 에 없다.** 기존 PC 에서 파일을 그대로 복사해온다.
-  없으면 dev 서버가 뜨지 않는다.
+  없으면 dev 서버가 뜨지 않고, `scripts/minutes-helper.js` 도 돌지 않는다.
+  최소한 아래 세 줄이 있어야 한다.
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://<프로젝트>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon 키>
+SUPABASE_SERVICE_ROLE_KEY=<service_role 키>
+```
+
 - 회사 프록시 환경에서는 Turbopack 이 구글 폰트를 못 받아 빌드가 깨진다.
   아래처럼 환경변수를 붙여 실행한다.
 
@@ -42,6 +50,21 @@ Supabase SQL Editor 에서 직접 돌려야 한다. 코드 배포로는 DB 구�
 | `supabase/migrations/014_fix_new_user_trigger.sql` | 가입 트리거 수정 + 유령 계정 복구 | **신규 가입이 전부 실패한다** (`Database error creating new user`) |
 
 `008_book_category.sql` 은 운영 DB 에 이미 있는 컬럼을 문서로 남긴 것이라 실행하지 않아도 된다.
+
+### ⚠️ service_role 키 재발급 (아직 안 함)
+
+`scripts/minutes-helper.js` 에 service_role 키가 하드코딩된 채로 커밋돼 있었다.
+저장소가 공개라서 **2026-06-04(`1a3f2ac`)부터 누구나 볼 수 있었다.**
+코드는 `.env.local` 을 읽도록 고쳤지만, **이미 공개된 키 자체는 아직 살아 있다.**
+
+service_role 은 RLS 를 전부 우회한다 — 키만 있으면 모든 테이블을 읽고 쓰고 지울 수 있다.
+고친 코드를 푸시해도 git 히스토리에는 옛 키가 그대로 남으므로, **재발급만이 무효화 방법이다.**
+
+1. Supabase → Project Settings → API Keys → `service_role` **Reset / Generate new**
+2. Vercel → Settings → Environment Variables → `SUPABASE_SERVICE_ROLE_KEY` 를 새 키로 교체 후 **재배포**
+3. 각 PC 의 `.env.local` 도 새 키로 교체
+
+재발급하면 옛 키를 쓰던 곳은 즉시 401 이 된다. **2번을 빠뜨리면 사이트의 쓰기 기능이 전부 멈춘다.**
 
 ### Supabase 대시보드에서 해야 할 설정 (가입 승인 메일)
 

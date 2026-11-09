@@ -68,8 +68,19 @@ interface Submission {
   one_liner: string | null;
   rating: number | null;
   created_at: string;
+  /** 공개 후 고쳤는지 보여주려고 함께 읽는다 */
+  updated_at?: string | null;
   profile?: { name: string; avatar_url?: string; role?: string };
 }
+
+/**
+ * 저장한 뒤 다시 손댄 글인지. 저장 시 updated_at 을 항상 새로 쓰기 때문에
+ * created_at 과 몇 초 차이는 '수정'으로 치지 않는다.
+ */
+const wasEdited = (s: Submission) => {
+  if (!s.updated_at) return false;
+  return new Date(s.updated_at).getTime() - new Date(s.created_at).getTime() > 60_000;
+};
 
 interface SubmissionStatus {
   user_id: string;
@@ -614,7 +625,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
       ? JSON.stringify(filteredDiscussions)
       : null;
 
-    // API를 통해 먼저 시도
+    // 예전에는 API 가 실패하면 브라우저에서 직접 Supabase 를 호출하는 폴백이 있었다.
+    // 그 경로는 RLS 에 막혀도 에러가 나지 않아서, 저장이 안 됐는데 저장된 것처럼
+    // 보였다. 폴백을 없애고 실패를 그대로 알린다.
     try {
       const res = await fetch(`/api/meetings/${schedule.id}/submission`, {
         method: 'POST',
@@ -627,38 +640,18 @@ export default function MeetingDetailPage({ params }: PageProps) {
         }),
       });
 
-      if (res.ok) {
-        await fetchMeetingData();
-        setIsSaving(false);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
         return;
       }
-    } catch (e) {
-      console.log('API save failed, trying direct');
+
+      await fetchMeetingData();
+    } catch {
+      alert('저장에 실패했습니다. 네트워크를 확인해주세요.');
+    } finally {
+      setIsSaving(false);
     }
-
-    // API 실패시 직접 호출
-    const submissionData = {
-      schedule_id: schedule.id,
-      user_id: user.id,
-      discussion: discussionJson,
-      one_liner: oneLiner || null,
-      rating: rating || null,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (mySubmission) {
-      await supabase
-        .from('meeting_submissions')
-        .update(submissionData)
-        .eq('id', mySubmission.id);
-    } else {
-      await supabase
-        .from('meeting_submissions')
-        .insert(submissionData);
-    }
-
-    await fetchMeetingData();
-    setIsSaving(false);
   };
 
   // 장난 신청이나 테스트로 들어온 참석 신청을 지운다 (관리자 전용).
@@ -1434,14 +1427,21 @@ export default function MeetingDetailPage({ params }: PageProps) {
         </Card>
       )}
 
-      {/* 내 발제 작성 (공개 전에만 수정 가능) */}
-      {!schedule.is_revealed && user && (
+      {/* 내 발제 작성.
+          공개된 뒤에는 이미 쓴 사람만 고칠 수 있다. 모임 도중에 평점을 바꾸고
+          싶은 경우가 실제로 있어서 열어 뒀고, 고친 글에는 '수정됨'이 붙는다.
+          공개 후 처음 쓰는 건 서버에서 막는다(남의 발제를 다 보고 쓰게 되므로). */}
+      {user && (!schedule.is_revealed || mySubmission) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
-              나의 발제 작성
-              <span className="text-sm font-normal text-gray-500">(내용은 공개 전까지 숨겨집니다)</span>
+              {schedule.is_revealed ? '나의 발제 수정' : '나의 발제 작성'}
+              <span className="text-sm font-normal text-gray-500">
+                {schedule.is_revealed
+                  ? '(고치면 수정됨 표시가 붙습니다)'
+                  : '(내용은 공개 전까지 숨겨집니다)'}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1552,6 +1552,9 @@ export default function MeetingDetailPage({ params }: PageProps) {
                           <Avatar src={submission.profile?.avatar_url} name={submission.profile?.name || ''} size="xs" />{submission.profile?.name || '알 수 없음'}
                           {submission.profile?.role === 'guest' && (
                             <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">게스트</span>
+                          )}
+                          {wasEdited(submission) && (
+                            <span className="text-[10px] font-semibold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">수정됨</span>
                           )}
                         </span>
                       </div>

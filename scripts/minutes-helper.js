@@ -9,11 +9,31 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
+const path = require('path');
 
-const supabase = createClient(
-  'https://ozehjrirqsgkcshfywsv.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96ZWhqcmlycXNna2NzaGZ5d3N2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTM0MTg0MiwiZXhwIjoyMDg0OTE3ODQyfQ.82G7aMSlUD511cpcQ0f9JZ_EyiMwr1sAC2ottnhwUNQ'
-);
+// service_role 키는 RLS 를 전부 우회한다. 저장소가 공개라 코드에 두면 안 된다.
+// .env.local 에서 읽는다(앱이 쓰는 변수명과 같다). 이 파일은 .gitignore 에 있다.
+try {
+  process.loadEnvFile(path.join(__dirname, '..', '.env.local'));
+} catch {
+  // 이미 환경변수로 들어와 있으면 .env.local 이 없어도 된다
+}
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  console.error(
+    '환경변수가 없습니다.\n' +
+    '프로젝트 루트에 .env.local 을 만들고 아래 두 줄을 넣어주세요.\n\n' +
+    '  NEXT_PUBLIC_SUPABASE_URL=https://<프로젝트>.supabase.co\n' +
+    '  SUPABASE_SERVICE_ROLE_KEY=<service_role 키>\n\n' +
+    '키는 Supabase 대시보드 → Project Settings → API Keys 에서 확인합니다.'
+  );
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 async function listMeetings() {
   const { data } = await supabase
