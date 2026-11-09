@@ -266,7 +266,7 @@ export default function BooksPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">책 목록</h1>
+          <h1 className="text-2xl font-bold text-gray-900">서재</h1>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map(i => (
@@ -280,7 +280,7 @@ export default function BooksPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-2xl font-bold text-gray-900">책 목록</h1>
+        <h1 className="text-2xl font-bold text-gray-900">서재</h1>
         <div className="flex items-center gap-2">
           {/* 제목만 있는 책이 남아 있을 때만 노출 */}
           {isAdmin && needsBackfillCount > 0 && (

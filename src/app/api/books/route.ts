@@ -3,6 +3,14 @@ import { getViewer, isMember } from '@/lib/permissions';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
+/** 책 상세의 "이 책으로 한 모임" 바로가기에 쓰는 최소 정보 */
+type BookMeeting = {
+  id: string;
+  title: string;
+  meeting_date: string;
+  is_revealed: boolean;
+};
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -16,7 +24,7 @@ export async function GET() {
       supabase.from('schedule_book_candidates').select('book_id'),
       supabase
         .from('schedules')
-        .select('selected_book_id, meeting_date, presenter_id')
+        .select('id, title, selected_book_id, meeting_date, presenter_id, is_revealed')
         .not('selected_book_id', 'is', null),
     ]);
 
@@ -40,6 +48,27 @@ export async function GET() {
       }
     }
 
+    // 그 책으로 진행한 모임들. 같은 책을 다시 읽으면 여러 개가 될 수 있어서 배열로 둔다.
+    // 책 상세에서 "이 책으로 한 모임" 바로가기를 만드는 데 쓴다.
+    const meetingsByBook = new Map<string, BookMeeting[]>();
+    for (const s of scheds || []) {
+      const bid = s.selected_book_id as string;
+      if (!bid) continue;
+      const list = meetingsByBook.get(bid) || [];
+      list.push({
+        id: s.id,
+        title: s.title,
+        meeting_date: s.meeting_date,
+        is_revealed: s.is_revealed,
+      });
+      meetingsByBook.set(bid, list);
+    }
+    for (const list of meetingsByBook.values()) {
+      list.sort(
+        (a, b) => new Date(b.meeting_date).getTime() - new Date(a.meeting_date).getTime()
+      );
+    }
+
     // 발제자 프로필 일괄 조회
     const presenterIds = [...new Set([...presenterIdByBook.values()])];
     const { data: presenters } = presenterIds.length
@@ -54,6 +83,7 @@ export async function GET() {
         ...b,
         was_nominated: nominatedSet.has(b.id),
         discussed_at: discussedAt.get(b.id) ?? null,
+        meetings: meetingsByBook.get(b.id) ?? [],
         presenter: pres ? { name: pres.name, avatar_url: pres.avatar_url ?? null } : null,
       };
     });

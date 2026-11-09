@@ -27,7 +27,7 @@ const menuItems = [
   { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
   { href: '/schedule', label: '일정 투표', icon: Calendar },
   { href: '/meetings', label: '모임 목록', icon: Users },
-  { href: '/books', label: '책 목록', icon: BookOpen },
+  { href: '/books', label: '서재', icon: BookOpen },
   { href: '/board', label: '자유게시판', icon: MessageCircle },
   // { href: '/gallery', label: '갤러리', icon: Camera }, // 임시 비활성화
 ];

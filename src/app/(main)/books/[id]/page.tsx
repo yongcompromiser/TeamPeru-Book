@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, BookOpen, Tag, User, Pencil, Check, X, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Tag, User, Users, Pencil, Check, X, Loader2, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { BOOK_STATUS_LABELS } from '@/types';
@@ -14,6 +14,14 @@ import { Avatar } from '@/components/ui/avatar';
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+/** 그 책으로 진행한 모임 (books API 가 함께 내려준다) */
+interface BookMeeting {
+  id: string;
+  title: string;
+  meeting_date: string;
+  is_revealed: boolean;
 }
 
 export default function BookDetailPage({ params }: PageProps) {
@@ -179,7 +187,7 @@ export default function BookDetailPage({ params }: PageProps) {
       <div className="text-center py-12">
         <p className="text-gray-500">책을 찾을 수 없습니다</p>
         <Link href="/books" className="text-blue-600 hover:underline mt-2 inline-block">
-          책 목록으로
+          서재로
         </Link>
       </div>
     );
@@ -192,7 +200,7 @@ export default function BookDetailPage({ params }: PageProps) {
         className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-4 h-4 mr-1" />
-        책 목록으로
+        서재로
       </Link>
 
       {/* Book Header */}
@@ -324,6 +332,38 @@ export default function BookDetailPage({ params }: PageProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* 이 책으로 진행한 모임.
+          책 목록에서 들어왔을 때 모임으로 넘어갈 길이 없어서 매번 헤맸다.
+          같은 책을 다시 읽으면 여러 개가 될 수 있어 전부 보여준다. */}
+      {book.meetings?.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Users className="w-5 h-5 text-purple-500" />
+              이 책으로 한 모임
+            </h2>
+            <div className="space-y-2">
+              {book.meetings.map((m: BookMeeting) => (
+                <Link
+                  key={m.id}
+                  href={`/meetings/${m.id}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 transition-colors hover:border-purple-300 hover:bg-purple-50"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 truncate">{m.title}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(m.meeting_date).toLocaleDateString('ko-KR')}
+                      {!m.is_revealed && ' · 공개 전'}
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 shrink-0 text-gray-400" />
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 등록 코멘트 */}
       <Card>

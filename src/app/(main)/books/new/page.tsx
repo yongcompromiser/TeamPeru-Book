@@ -115,7 +115,7 @@ export default function NewBookPage() {
         className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
       >
         <ArrowLeft className="w-4 h-4 mr-1" />
-        책 목록으로
+        서재로
       </Link>
 
       <Card>
