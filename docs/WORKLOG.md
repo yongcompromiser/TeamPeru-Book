@@ -60,11 +60,22 @@ Supabase SQL Editor 에서 직접 돌려야 한다. 코드 배포로는 DB 구�
 service_role 은 RLS 를 전부 우회한다 — 키만 있으면 모든 테이블을 읽고 쓰고 지울 수 있다.
 고친 코드를 푸시해도 git 히스토리에는 옛 키가 그대로 남으므로, **재발급만이 무효화 방법이다.**
 
-1. Supabase → Project Settings → API Keys → `service_role` **Reset / Generate new**
-2. Vercel → Settings → Environment Variables → `SUPABASE_SERVICE_ROLE_KEY` 를 새 키로 교체 후 **재배포**
-3. 각 PC 의 `.env.local` 도 새 키로 교체
+진행 상황 (2026-11-09):
 
-재발급하면 옛 키를 쓰던 곳은 즉시 401 이 된다. **2번을 빠뜨리면 사이트의 쓰기 기능이 전부 멈춘다.**
+- [x] 새 secret 키 `teamperu_prod` 발급 (`sb_secret_...`)
+- [x] Vercel `SUPABASE_SERVICE_ROLE_KEY` 교체 + 재배포
+- [x] 동작 확인 — 관리자 멤버 목록, 회의록 정리본 모두 정상
+- [ ] **옛 `service_role`(legacy JWT) revoke** ← 여기가 실제 조치. 아직 안 함
+- [ ] 각 PC `.env.local` 에 새 키 반영 (이 PC 는 `.env.local` 자체가 없음)
+
+남은 두 가지:
+
+1. Supabase → **Legacy API keys** → `service_role` revoke / disable.
+   anon 과 묶여서 한꺼번에만 꺼진다면, Vercel 의 `NEXT_PUBLIC_SUPABASE_ANON_KEY` 도
+   새 publishable 키로 바꾸고 재배포한 뒤에 끈다. 안 그러면 로그인이 깨진다.
+2. `.env.local` 생성. 없으면 dev 서버와 `scripts/minutes-helper.js` 가 안 돈다.
+
+**옛 키를 revoke 하기 전까지는 노출된 상태가 그대로다.** 새 키를 만든 것만으로는 무효화되지 않는다.
 
 ### Supabase 대시보드에서 해야 할 설정 (가입 승인 메일)
 
